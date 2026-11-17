@@ -36,9 +36,11 @@ CI 只有 `contents: read` 权限，不读取 npm Token，不发布任何包。
 4. 重新执行完整测试和制品隔离安装；
 5. 检查 npm 上的同版本：不存在才发布；已存在且 SHA-512 完全相同则幂等继续；内容不同立即拒绝；
 6. 发布已经通过安装测试的 `.tgz`，并生成 provenance；
-7. 从 npm Registry 回读并核对版本；Registry 首次发布存在传播延迟，Workflow 最多等待五分钟。
+7. 从 npm Registry 回读并核对版本；Registry 首次发布存在传播延迟，Workflow 最多等待二十分钟。
 
 发布 Job 使用 GitHub-hosted Ubuntu、Node 24、npm 11.8.0，并只授予 `contents: read` 与 `id-token: write`。
+
+npm 在包可安装前执行发布时扫描，通常约五分钟，高峰时可能十五分钟或更久；这不是固定时限。`npm publish` 返回成功后暂时 `404` 不足以判定发布失败。等待 Registry 暴露对应版本并核对 integrity，不重复发布不同内容。当前 main 的校验窗口为二十分钟，Job 上限三十分钟；`v0.1.2` 固定发布提交仍使用原五分钟窗口，若仅回读超时，应等待可用后重跑原工作流进行幂等校验。依据：[npm 发布时扫描说明](https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/)。
 
 每次发布前核验仓库身份、npm scope 权限及版本唯一性。`@seetheforest/formami-sdk@0.1.2` 使用 `v0.1.2` Release 触发发布；是否成功以对应 Workflow 和 npm Registry 回读为准，任何已存在版本均不得覆盖。
 
