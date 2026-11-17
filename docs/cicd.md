@@ -2,10 +2,10 @@
 
 ## 发布目标
 
-- npm 包：`@perrin-yong/umami-sdk`
+- npm 包：`@seetheforest/formami-sdk`
 - Registry：`https://registry.npmjs.org/`
 - 可见性：public
-- 源码仓库：`PerrinYong/umami-sdk`
+- 源码仓库：`SeeTForest/formami-sdk`
 - 版本：SemVer；npm 已发布版本不可覆盖
 - 发布触发：GitHub Release 的 `published` 事件
 
@@ -40,24 +40,26 @@ CI 只有 `contents: read` 权限，不读取 npm Token，不发布任何包。
 
 发布 Job 使用 GitHub-hosted Ubuntu、Node 24、npm 11.8.0，并只授予 `contents: read` 与 `id-token: write`。
 
+每次发布前核验仓库身份、npm scope 权限及版本唯一性。`@seetheforest/formami-sdk@0.1.2` 使用 `v0.1.2` Release 触发发布；是否成功以对应 Workflow 和 npm Registry 回读为准，任何已存在版本均不得覆盖。
+
 ## Token 配置
 
-当前工作流使用 GitHub Repository Secret `NPM_TOKEN`（配置 Trusted Publishing 后可撤销）。Token 必须有权发布 `@perrin-yong` Scope，并允许 CI 发布所需的 2FA 行为。
+当前工作流使用 GitHub Repository Secret `NPM_TOKEN`（配置 Trusted Publishing 后可撤销）。Token 必须有权发布 `@seetheforest/formami-sdk` 包，并允许 CI 发布所需的 2FA 行为。
 
 Token 只从私有文件写入 GitHub Secret，不能写入 `.npmrc`、Workflow、Shell 历史或 Git：
 
 ```powershell
 Get-Content -Raw <NPM_TOKEN_FILE> |
-  gh secret set NPM_TOKEN --repo PerrinYong/umami-sdk
+  gh secret set NPM_TOKEN --repo SeeTForest/formami-sdk
 
-gh secret list --repo PerrinYong/umami-sdk
+gh secret list --repo SeeTForest/formami-sdk
 ```
 
 GitHub 只允许查看 Secret 名称，不能回读值。Token 轮换后重复执行同一命令。
 
 ## 发布一个版本
 
-1. 确认 npm 用户拥有 `@perrin-yong` Scope；首次发布时确认包名可用；
+1. 确认 npm 用户有权发布 `@seetheforest/formami-sdk`；首次发布前核实包名可用性与归属；
 2. 确认 `NPM_TOKEN` Secret 已配置；
 3. 在本地执行完整验证：
 
@@ -70,8 +72,8 @@ python tools/check_version.py
 5. 创建与 `VERSION` 一致的 GitHub Release，例如：
 
 ```powershell
-gh release create v0.1.1 `
-  --repo PerrinYong/umami-sdk `
+gh release create v0.1.2 `
+  --repo SeeTForest/formami-sdk `
   --target main `
   --generate-notes `
   --verify-tag
@@ -82,14 +84,14 @@ gh release create v0.1.1 `
 6. 查看 Workflow：
 
 ```powershell
-gh run list --repo PerrinYong/umami-sdk --workflow npm-release.yml
+gh run list --repo SeeTForest/formami-sdk --workflow npm-release.yml
 ```
 
 7. 验证消费者安装：
 
 ```bash
-npm view @perrin-yong/umami-sdk@0.1.1 version
-npm install --save-exact @perrin-yong/umami-sdk@0.1.1
+npm view @seetheforest/formami-sdk@0.1.2 version
+npm install --save-exact @seetheforest/formami-sdk@0.1.2
 ```
 
 ## 后续版本
@@ -112,8 +114,8 @@ npm 版本不可覆盖。错误版本应立即停止推广并发布修复版本�
 首次 Token 发布成功后，建议在 npm 包 Settings → Trusted Publisher 配置：
 
 ```text
-GitHub user: PerrinYong
-Repository:  umami-sdk
+GitHub user: SeeTForest
+Repository:  formami-sdk
 Workflow:    npm-release.yml
 Allowed:     npm publish
 ```

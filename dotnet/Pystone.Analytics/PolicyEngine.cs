@@ -73,7 +73,7 @@ internal sealed class PolicyEngine
         ValidateOptions();
     }
 
-    public (UmamiRequest Request, string EventId) CreateEvent(
+    public (FormamiRequest Request, string EventId) CreateEvent(
         string eventName,
         IReadOnlyDictionary<string, object?> properties,
         string? subjectId,
@@ -100,10 +100,10 @@ internal sealed class PolicyEngine
         foreach (var pair in properties) data[pair.Key] = pair.Value;
         if (data.Count > Limit("property_count")) throw new PolicyException("invalid_property", "property_count");
 
-        return (new UmamiRequest
+        return (new FormamiRequest
         {
             Type = "event",
-            Payload = new UmamiPayload
+            Payload = new FormamiPayload
             {
                 Website = _options.WebsiteId.ToString("D"),
                 Hostname = _options.Hostname,
@@ -116,14 +116,14 @@ internal sealed class PolicyEngine
         }, eventId);
     }
 
-    public UmamiRequest CreateIdentify(string subjectId, IReadOnlyDictionary<string, object?> properties)
+    public FormamiRequest CreateIdentify(string subjectId, IReadOnlyDictionary<string, object?> properties)
     {
         ValidateSubjectId(subjectId);
         ValidateProperties(properties, _sessionProperties);
-        return new UmamiRequest
+        return new FormamiRequest
         {
             Type = "identify",
-            Payload = new UmamiPayload
+            Payload = new FormamiPayload
             {
                 Website = _options.WebsiteId.ToString("D"),
                 Id = subjectId,
@@ -132,14 +132,14 @@ internal sealed class PolicyEngine
         };
     }
 
-    public UmamiRequest CreatePage(string path, string? title, string? subjectId)
+    public FormamiRequest CreatePage(string path, string? title, string? subjectId)
     {
         if (subjectId is not null) ValidateSubjectId(subjectId);
         var normalized = NormalizePage(path, title);
-        return new UmamiRequest
+        return new FormamiRequest
         {
             Type = "event",
-            Payload = new UmamiPayload
+            Payload = new FormamiPayload
             {
                 Website = _options.WebsiteId.ToString("D"),
                 Hostname = _options.Hostname,
@@ -150,7 +150,7 @@ internal sealed class PolicyEngine
         };
     }
 
-    public void ValidatePersistedRequest(UmamiRequest request)
+    public void ValidatePersistedRequest(FormamiRequest request)
     {
         if (!string.Equals(request.Payload.Website, _options.WebsiteId.ToString("D"), StringComparison.Ordinal))
             throw new PolicyException("invalid_property", "queue_website");

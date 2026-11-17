@@ -18,6 +18,7 @@ from pystone_analytics import (
     ConsentState,
     TransportOutcome,
     TransportResult,
+    FormamiHttpTransport,
     UmamiHttpTransport,
     derive_installation_subject_id,
     derive_user_subject_id,
@@ -108,14 +109,14 @@ class FakeResponse:
 
 def config(**overrides: object) -> AnalyticsConfig:
     values: dict[str, object] = {
-        "endpoint": "https://umami.example.test",
+        "endpoint": "https://formami.example.test",
         "website_id": "123e4567-e89b-42d3-a456-426614174000",
         "hostname": "cli.example.test",
         "product": "test-product",
         "environment": "staging",
         "surface": "cli",
         "product_version": "1.0.0",
-        "user_agent": "Test/1.0 Analytics/0.1.1",
+        "user_agent": "Test/1.0 Analytics/0.1.2",
         "flush_interval_seconds": 3600,
     }
     values.update(overrides)
@@ -193,7 +194,7 @@ class SdkTests(unittest.TestCase):
             self.assertFalse(path.exists())
             second.close()
 
-    def test_identity_is_scoped_and_fits_umami(self) -> None:
+    def test_identity_is_scoped_and_fits_formami(self) -> None:
         first = derive_installation_subject_id("product-a", "installation")
         second = derive_installation_subject_id("product-b", "installation")
         self.assertEqual(len(first), 43)
@@ -409,8 +410,24 @@ class SdkTests(unittest.TestCase):
             finally:
                 second.close()
 
+    def test_transport_alias_and_cache_headers_remain_compatible(self) -> None:
+        self.assertIs(FormamiHttpTransport, UmamiHttpTransport)
+        transport = FormamiHttpTransport(config())
+        request = [{"type": "event", "payload": {"website": config().website_id}}]
+        with patch("pystone_analytics.transport.urlopen", return_value=FakeResponse(b'{"cache":"valid-cache"}')) as send:
+            self.assertEqual(transport.send(request).outcome, TransportOutcome.SUCCESS)
+            self.assertEqual(transport.send(request).outcome, TransportOutcome.SUCCESS)
+            headers = dict((key.lower(), value) for key, value in send.call_args.args[0].header_items())
+            self.assertEqual(headers["x-formami-cache"], "valid-cache")
+            self.assertEqual(headers["x-umami-cache"], "valid-cache")
+            transport.reset_session()
+            transport.send(request)
+            headers = dict((key.lower(), value) for key, value in send.call_args.args[0].header_items())
+            self.assertNotIn("x-formami-cache", headers)
+            self.assertNotIn("x-umami-cache", headers)
+
     def test_http_transport_bounds_success_response_and_classifies_statuses(self) -> None:
-        transport = UmamiHttpTransport(config())
+        transport = FormamiHttpTransport(config())
         request = [{"type": "event", "payload": {"website": config().website_id}}]
         with patch(
             "pystone_analytics.transport.urlopen",

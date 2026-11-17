@@ -1,5 +1,7 @@
 # 产品分析接入规范
 
+本文中的 `analytics.example.com` / `analytics-cn.example.com` 是通用示例，不是可用服务；实际 Endpoint、区域与 Website ID 必须由宿主产品配置提供。
+
 ## 1. Adapter 契约
 
 业务代码只调用稳定接口：
@@ -13,16 +15,16 @@ flush()
 disable()
 ```
 
-SDK 负责 Schema 校验、公共上下文、身份、Consent、字段 allowlist、敏感内容阻断、批处理、短超时、有限重试、容量上限、过期丢弃和 Umami Payload 映射。`track`、`identify`、`page` 只进行同步的本地校验和内存入队；网络与可选持久化由后台执行。Analytics 不可达时静默降级，不能阻塞或改变业务结果。
+SDK 负责 Schema 校验、公共上下文、身份、Consent、字段 allowlist、敏感内容阻断、批处理、短超时、有限重试、容量上限、过期丢弃和 Formami Payload 映射。`track`、`identify`、`page` 只进行同步的本地校验和内存入队；网络与可选持久化由后台执行。Analytics 不可达时静默降级，不能阻塞或改变业务结果。
 
 队列、重试、响应体和持久文件同时有默认值与不可突破的硬上限。持久队列恢复时必须重新验证 Website、Payload 结构、当前 Schema、身份和隐私策略；损坏或被篡改的数据直接删除，不能因为“来自本机队列”而绕过 allowlist。完整故障模型与测试证据见 [`production-readiness.md`](production-readiness.md)。
 
-Endpoint 与 Website ID 由产品环境注入：国内 ECS 产品使用 `umami-cn.pystone.net`，海外 VPS 产品使用 `umami.pystone.net`。客户端不得在两个区域之间自动故障转移。
+Endpoint 与 Website ID 由产品环境注入：国内 ECS 产品使用 `analytics-cn.example.com`，海外 VPS 产品使用 `analytics.example.com`。客户端不得在两个区域之间自动故障转移。
 
 建议结构：
 
 ```text
-umami-sdk/
+formami-sdk/
 ├── schema/       # 单一事件注册表与隐私策略源
 ├── typescript/   # Browser 与 Node/OpenCode SDK
 ├── dotnet/       # Windows Desktop SDK
@@ -42,7 +44,7 @@ context:
   environment: production
   surface: desktop
   product_version: 1.2.0
-  sdk_version: 0.1.1
+  sdk_version: 0.1.2
   platform: windows
   architecture: x64
   locale: zh-CN
@@ -59,9 +61,9 @@ properties:
 ```
 
 - 时间统一为 UTC。
-- SDK 会生成本地 `event_id` 用于队列和诊断，但不上传到 Umami，也不能把它当作服务端去重保证。
+- SDK 会生成本地 `event_id` 用于队列和诊断，但不上传到 Formami，也不能把它当作服务端去重保证。
 - 事件名为小写 `snake_case`，描述已经发生的业务事实。
-- 当前 Umami 约束按事件名 50 字符、Event Data 字符串 500 字符、对象 50 个属性执行；Adapter 可以使用更严格上限。
+- 当前 Formami 约束按事件名 50 字符、Event Data 字符串 500 字符、对象 50 个属性执行；Adapter 可以使用更严格上限。
 - 属性优先使用枚举、数字、布尔值和区间，不发送自由文本。
 - 同名属性不改变含义或单位；语义变化提升 `event_version`。
 
@@ -72,11 +74,11 @@ properties:
 - 一个独立产品一个 Website；Production 与 Staging 分开。
 - 同一产品多个客户端确需原生统一看板时可以共用 Website，并用 `surface` 区分。
 - Website 是产品、区域和隐私边界，不简单等于域名或仓库。
-- 同一产品在两个 Umami 实例中的 Website ID 必须不同。
+- 同一产品在两个 Formami 实例中的 Website ID 必须不同。
 
 ### 匿名网站访客
 
-使用 Umami 默认无 Cookie Session，不主动设置长期 Distinct ID。Visitors 用于趋势而非稳定自然人数；匿名留存受网络、设备和隐私环境影响。
+使用 Formami 默认无 Cookie Session，不主动设置长期 Distinct ID。Visitors 用于趋势而非稳定自然人数；匿名留存受网络、设备和隐私环境影响。
 
 ### Desktop、插件与 CLI
 
@@ -102,7 +104,7 @@ HMAC Key 只存在于后端。Distinct ID 控制在 50 字符内；不发送 Ema
 
 ### 网站
 
-Umami Web Tracker 负责页面和来源，Adapter 负责下载、注册、联系、付费入口等显式业务事件。不自动采集所有 Click、Input、DOM 或文本；URL 删除 Query、Fragment、Token 和动态标识。
+Formami Web Tracker 负责页面和来源，Adapter 负责下载、注册、联系、付费入口等显式业务事件。不自动采集所有 Click、Input、DOM 或文本；URL 删除 Query、Fragment、Token 和动态标识。
 
 ### Windows Desktop
 

@@ -1,4 +1,5 @@
 /artifacts/
+/.local-config/
 /typescript/node_modules/
 /typescript/dist/
 /dotnet/**/bin/

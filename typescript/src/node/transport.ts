@@ -1,4 +1,4 @@
-import type { UmamiRequest } from '../core/index.js';
+import type { FormamiRequest } from '../core/index.js';
 
 export type TransportResult =
   | { kind: 'success'; partialErrors?: number }
@@ -6,28 +6,28 @@ export type TransportResult =
   | { kind: 'permanent' };
 
 export interface AnalyticsTransport {
-  send(requests: UmamiRequest[]): Promise<TransportResult>;
+  send(requests: FormamiRequest[]): Promise<TransportResult>;
   resetSession?(): void;
 }
 
-export interface UmamiHttpTransportConfig {
+export interface FormamiHttpTransportConfig {
   endpoint: string;
   userAgent: string;
   timeoutMs: number;
   fetchImplementation?: typeof fetch;
 }
 
-export class UmamiHttpTransport implements AnalyticsTransport {
+export class FormamiHttpTransport implements AnalyticsTransport {
   private static readonly MAX_RESPONSE_BYTES = 64 * 1024;
   private cache: string | undefined;
   private sessionGeneration = 0;
   private readonly fetchImplementation: typeof fetch;
 
-  constructor(private readonly config: UmamiHttpTransportConfig) {
+  constructor(private readonly config: FormamiHttpTransportConfig) {
     this.fetchImplementation = config.fetchImplementation ?? globalThis.fetch;
   }
 
-  async send(requests: UmamiRequest[]): Promise<TransportResult> {
+  async send(requests: FormamiRequest[]): Promise<TransportResult> {
     if (requests.length === 0) return { kind: 'success' };
     const generation = this.sessionGeneration;
     const controller = new AbortController();
@@ -38,7 +38,8 @@ export class UmamiHttpTransport implements AnalyticsTransport {
         headers: {
           'content-type': 'application/json',
           'user-agent': this.config.userAgent,
-          ...(this.cache ? { 'x-umami-cache': this.cache } : {}),
+          // Same cache for current Formami and legacy servers; no extra request.
+          ...(this.cache ? { 'x-formami-cache': this.cache, 'x-umami-cache': this.cache } : {}),
         },
         body: JSON.stringify(requests),
         signal: controller.signal,
@@ -94,7 +95,7 @@ export class UmamiHttpTransport implements AnalyticsTransport {
         const { done, value } = await reader.read();
         if (done) break;
         length += value.byteLength;
-        if (length > UmamiHttpTransport.MAX_RESPONSE_BYTES) {
+        if (length > FormamiHttpTransport.MAX_RESPONSE_BYTES) {
           await reader.cancel().catch(() => undefined);
           return null;
         }
@@ -125,3 +126,7 @@ export class UmamiHttpTransport implements AnalyticsTransport {
     return Number.isFinite(date) ? Math.max(0, (date - Date.now()) / 1000) : Number.NaN;
   }
 }
+
+/** @deprecated Use FormamiHttpTransportConfig. */
+export type UmamiHttpTransportConfig = FormamiHttpTransportConfig;
+export { FormamiHttpTransport as UmamiHttpTransport };

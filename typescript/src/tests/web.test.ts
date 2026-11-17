@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { AnalyticsProperties } from '../core/index.js';
-import { WebAnalyticsClient, type UmamiTracker } from '../web/index.js';
+import { WebAnalyticsClient, type FormamiTracker } from '../web/index.js';
 import { baseConfig } from './helpers.js';
 
 class FakeTracker {
@@ -40,7 +40,7 @@ test('web adapter maps validated events to the tracker', async () => {
   const tracker = new FakeTracker();
   const client = new WebAnalyticsClient({
     ...baseConfig({ initialConsent: 'granted' }),
-    tracker: tracker as UmamiTracker,
+    tracker: tracker as FormamiTracker,
   });
   const result = client.track('operation_completed', {
     feature: 'scan',
@@ -56,7 +56,7 @@ test('web adapter blocks sensitive values and clears on withdrawal', async () =>
   const tracker = new FakeTracker();
   const client = new WebAnalyticsClient({
     ...baseConfig({ initialConsent: 'granted' }),
-    tracker: tracker as UmamiTracker,
+    tracker: tracker as FormamiTracker,
   });
   assert.equal(client.track('feature_used', { feature: 'person@example.com' }).accepted, false);
   assert.equal(client.identify('valid_subject_id', { plan: 'free' }).accepted, true);
@@ -71,7 +71,7 @@ test('web track returns before a blocked tracker is invoked', async () => {
   const blocked = new Promise<void>(resolve => {
     release = resolve;
   });
-  const tracker: UmamiTracker = {
+  const tracker: FormamiTracker = {
     track: async () => {
       calls += 1;
       await blocked;
@@ -97,7 +97,7 @@ test('beforeSend blocks direct tracker calls that bypass the SDK policy', async 
   const tracker = new FakeTracker();
   const client = new WebAnalyticsClient({
     ...baseConfig({ initialConsent: 'granted' }),
-    tracker: tracker as UmamiTracker,
+    tracker: tracker as FormamiTracker,
   });
   client.track('feature_used', { feature: 'scan' });
   await client.flush();

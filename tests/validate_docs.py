@@ -54,7 +54,7 @@ readme = (SDK_ROOT / "README.md").read_text(encoding="utf-8")
 assert f"当前 SDK 版本：`{sdk_version}`" in guide
 assert f"事件 Schema 版本：`{registry['schema_version']}`" in guide
 assert f"Privacy Policy 版本：`{policy['policy_version']}`" in guide
-assert package_name == "@perrin-yong/umami-sdk"
+assert package_name == "@seetheforest/formami-sdk"
 assert package_name in guide
 assert package_name in product_guide
 assert package_name in readme
@@ -83,7 +83,7 @@ for marker in (
 
 assert "NuGet.org" in configuration and "PyPI" in configuration
 assert "不要尝试从 npm 安装 .NET/Python" in configuration
-assert "不使用 `data-umami-event`" in product_guide
+assert "不使用 `data-formami-event`" in product_guide
 assert "会将它视为绕过中央 Schema 并阻断" in product_guide
 
 node_client = (SDK_ROOT / "typescript/src/node/client.ts").read_text(encoding="utf-8")
@@ -156,6 +156,7 @@ for document in (
     CONFIGURATION,
     CICD,
     SDK_ROOT / "README.md",
+    SDK_ROOT / "docs/formami-migration.md",
 ):
     validate_local_links(document)
 

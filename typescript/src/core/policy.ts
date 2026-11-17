@@ -8,7 +8,7 @@ import type {
   EventRegistry,
   PageProperties,
   PrivacyPolicy,
-  UmamiRequest,
+  FormamiRequest,
 } from './types.js';
 
 const EVENT_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
@@ -119,7 +119,7 @@ export class PolicyEngine {
     }
     for (const [key, value] of [
       ['product_version', config.productVersion],
-      ['sdk_version', config.sdkVersion ?? '0.1.1'],
+      ['sdk_version', config.sdkVersion ?? '0.1.2'],
       ['platform', config.platform],
       ['architecture', config.architecture],
       ['locale', config.locale],
@@ -192,7 +192,7 @@ export class PolicyEngine {
       environment: this.config.environment,
       surface: this.config.surface,
       product_version: this.config.productVersion,
-      sdk_version: this.config.sdkVersion ?? '0.1.1',
+      sdk_version: this.config.sdkVersion ?? '0.1.2',
       consent_state: 'granted',
       policy_version: this.policy.policy_version,
       ...this.optionalContext(),
@@ -263,7 +263,7 @@ export class PolicyEngine {
     properties: AnalyticsProperties,
     subjectId?: string,
     occurredAt = new Date(),
-  ): { request: UmamiRequest; eventId: string } {
+  ): { request: FormamiRequest; eventId: string } {
     const definition = this.validateEvent(eventName, properties);
     if (subjectId) this.validateSubjectId(subjectId);
     const eventId = createEventId();
@@ -273,7 +273,7 @@ export class PolicyEngine {
       environment: this.config.environment,
       surface: this.config.surface,
       product_version: this.config.productVersion,
-      sdk_version: this.config.sdkVersion ?? '0.1.1',
+      sdk_version: this.config.sdkVersion ?? '0.1.2',
       consent_state: 'granted',
       policy_version: this.policy.policy_version,
       ...this.optionalContext(),
@@ -303,7 +303,7 @@ export class PolicyEngine {
     };
   }
 
-  createIdentifyRequest(subjectId: string, properties: AnalyticsProperties): UmamiRequest {
+  createIdentifyRequest(subjectId: string, properties: AnalyticsProperties): FormamiRequest {
     this.validateSubjectId(subjectId);
     this.validateSessionProperties(properties);
     return {
@@ -316,7 +316,7 @@ export class PolicyEngine {
     };
   }
 
-  createPageRequest(page: PageProperties, subjectId?: string, allowUtm = false): UmamiRequest {
+  createPageRequest(page: PageProperties, subjectId?: string, allowUtm = false): FormamiRequest {
     if (subjectId) this.validateSubjectId(subjectId);
     const normalized = this.normalizePage(page, allowUtm);
     return {

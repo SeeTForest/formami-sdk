@@ -16,8 +16,8 @@ SEMVER = re.compile(
     r"(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?"
     r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
 )
-PACKAGE_NAME = "@perrin-yong/umami-sdk"
-REPOSITORY_URL = "git+https://github.com/PerrinYong/umami-sdk.git"
+PACKAGE_NAME = "@seetheforest/formami-sdk"
+REPOSITORY_URL = "git+https://github.com/SeeTForest/formami-sdk.git"
 
 
 def require_match(pattern: str, contents: str, source: str) -> str:

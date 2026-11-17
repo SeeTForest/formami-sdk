@@ -19,7 +19,7 @@ if (-not (Test-Path -LiteralPath $artifactRoot -PathType Container)) {
     throw "SDK artifact directory does not exist: $artifactRoot"
 }
 
-$npmPackage = Get-ChildItem -LiteralPath $artifactRoot -Filter "perrin-yong-umami-sdk-*.tgz" -File |
+$npmPackage = Get-ChildItem -LiteralPath $artifactRoot -Filter "seetheforest-formami-sdk-*.tgz" -File |
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1
 $nugetPackage = Get-ChildItem -LiteralPath $artifactRoot -Filter "Pystone.Analytics.*.nupkg" -File |
@@ -39,6 +39,8 @@ if (-not $smokeRoot.StartsWith($temporaryRoot, [System.StringComparison]::Ordina
     throw "Refusing to use a smoke-test directory outside the system temporary directory."
 }
 New-Item -ItemType Directory -Path $smokeRoot | Out-Null
+$previousNugetPackages = $env:NUGET_PACKAGES
+$env:NUGET_PACKAGES = Join-Path $smokeRoot "nuget-cache"
 
 try {
     $npmDirectory = Join-Path $smokeRoot "npm"
@@ -50,13 +52,14 @@ try {
         npm install --ignore-scripts --no-audit --no-fund $npmPackage.FullName | Out-Null
         Assert-NativeSuccess "npm package installation"
         node --input-type=module --eval @"
-const nodeSdk = await import('@perrin-yong/umami-sdk/node');
-const webSdk = await import('@perrin-yong/umami-sdk/web');
+const nodeSdk = await import('@seetheforest/formami-sdk/node');
+const webSdk = await import('@seetheforest/formami-sdk/web');
+if (nodeSdk.FormamiHttpTransport !== nodeSdk.UmamiHttpTransport) throw new Error('Legacy transport export was lost');
 if (typeof nodeSdk.createNodeAnalytics !== 'function' || typeof webSdk.createWebAnalytics !== 'function') {
   throw new Error('npm package exports are incomplete');
 }
 const common = {
-  endpoint: 'https://umami.example.test',
+  endpoint: 'https://formami.example.test',
   websiteId: '123e4567-e89b-42d3-a456-426614174000',
   hostname: 'consumer.example.test',
   product: 'consumer-product',
@@ -68,7 +71,7 @@ const common = {
 const batches = [];
 const nodeClient = nodeSdk.createNodeAnalytics({
   ...common,
-  userAgent: 'Consumer/1.0 PystoneAnalytics/0.1.1',
+  userAgent: 'Consumer/1.0 PystoneAnalytics/0.1.2',
   flushIntervalMs: 60000,
   transport: { send: async requests => { batches.push(requests); return { kind: 'success' }; } },
 });
@@ -100,12 +103,14 @@ if (tracked.length !== 1) throw new Error('installed Web package did not invoke 
         [System.IO.File]::WriteAllText(
             (Join-Path $npmDirectory "consumer.mts"),
             @"
-import { createNodeAnalytics, type AnalyticsTransport } from '@perrin-yong/umami-sdk/node';
-import { createWebAnalytics } from '@perrin-yong/umami-sdk/web';
+import { createNodeAnalytics, FormamiHttpTransport, UmamiHttpTransport, type FormamiHttpTransportConfig, type UmamiHttpTransportConfig, type AnalyticsTransport } from '@seetheforest/formami-sdk/node';
+import type { FormamiRequest, UmamiRequest } from '@seetheforest/formami-sdk/core';
+import { createWebAnalytics, type FormamiTracker, type UmamiTracker } from '@seetheforest/formami-sdk/web';
+const compatibilityTypes = (request: UmamiRequest, tracker: UmamiTracker, config: UmamiHttpTransportConfig): [FormamiRequest, FormamiTracker, FormamiHttpTransportConfig] => [request, tracker, config];
 
 const transport: AnalyticsTransport = { send: async () => ({ kind: 'success' }) };
 const common = {
-  endpoint: 'https://umami.example.test',
+  endpoint: 'https://formami.example.test',
   websiteId: '123e4567-e89b-42d3-a456-426614174000',
   hostname: 'consumer.example.test',
   product: 'consumer-product',
@@ -139,18 +144,20 @@ createWebAnalytics({ ...common, surface: 'web' }).disable();
             (Join-Path $dotnetDirectory "Program.cs"),
             @"
 using Pystone.Analytics;
+UmamiRequest compatibilityRequest = new FormamiRequest { Type = "event", Payload = new FormamiPayload { Website = "123e4567-e89b-42d3-a456-426614174000" } };
+if (compatibilityRequest.Payload.Website.Length == 0) throw new InvalidOperationException("DTO compatibility failed.");
 var subject = AnalyticsIdentity.DeriveInstallationSubjectId("smoke-product", "installation");
 if (subject.Length != 43) throw new InvalidOperationException("NuGet package API is unavailable.");
 await using var client = new AnalyticsClient(new AnalyticsOptions
 {
-    Endpoint = new Uri("https://umami.example.test"),
+    Endpoint = new Uri("https://formami.example.test"),
     WebsiteId = Guid.Parse("123e4567-e89b-42d3-a456-426614174000"),
     Hostname = "consumer.example.test",
     Product = "consumer-product",
     Environment = "staging",
     Surface = "desktop",
     ProductVersion = "1.0.0",
-    UserAgent = "Consumer/1.0 PystoneAnalytics/0.1.1",
+    UserAgent = "Consumer/1.0 PystoneAnalytics/0.1.2",
 });
 if (client.Track("product_started").Code != "consent_not_granted")
     throw new InvalidOperationException("NuGet package consent default is unsafe.");
@@ -174,17 +181,18 @@ Console.WriteLine("NuGet SDK smoke test passed.");
     & $pythonExecutable -m pip install --disable-pip-version-check --no-deps $pythonPackage.FullName | Out-Null
     Assert-NativeSuccess "Python wheel installation"
     & $pythonExecutable -c @"
-from pystone_analytics import AnalyticsClient, AnalyticsConfig, derive_installation_subject_id
+from pystone_analytics import AnalyticsClient, AnalyticsConfig, FormamiHttpTransport, UmamiHttpTransport, derive_installation_subject_id
+assert FormamiHttpTransport is UmamiHttpTransport
 assert len(derive_installation_subject_id('smoke-product', 'installation')) == 43
 client = AnalyticsClient(AnalyticsConfig(
-    endpoint='https://umami.example.test',
+    endpoint='https://formami.example.test',
     website_id='123e4567-e89b-42d3-a456-426614174000',
     hostname='consumer.example.test',
     product='consumer-product',
     environment='staging',
     surface='cli',
     product_version='1.0.0',
-    user_agent='Consumer/1.0 PystoneAnalytics/0.1.1',
+    user_agent='Consumer/1.0 PystoneAnalytics/0.1.2',
 ))
 assert client.track('product_started').code == 'consent_not_granted'
 client.disable()
@@ -195,6 +203,7 @@ print('Python SDK smoke test passed.')
 
     Write-Output "SDK package installation smoke tests passed."
 } finally {
+    $env:NUGET_PACKAGES = $previousNugetPackages
     $resolvedSmokeRoot = [System.IO.Path]::GetFullPath($smokeRoot)
     if ($resolvedSmokeRoot.StartsWith($temporaryRoot, [System.StringComparison]::OrdinalIgnoreCase) -and
         (Test-Path -LiteralPath $resolvedSmokeRoot)) {

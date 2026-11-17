@@ -5,7 +5,7 @@
 
 ## 背景
 
-网站、Windows Desktop、OpenCode/Node、CLI 和 Agent 都可以直接调用 Umami，但直接调用会在每个产品重复实现 Consent、字段过滤、身份派生、超时、队列和重试。重复实现不仅增加成本，也更容易泄露自由文本或让 Analytics 故障进入业务调用链。
+网站、Windows Desktop、OpenCode/Node、CLI 和 Agent 都可以直接调用 Formami，但直接调用会在每个产品重复实现 Consent、字段过滤、身份派生、超时、队列和重试。重复实现不仅增加成本，也更容易泄露自由文本或让 Analytics 故障进入业务调用链。
 
 另一方面，建立抽象层级很多、可任意替换 Provider 的通用遥测框架，会把尚未出现的需求提前变成长期维护成本。
 
@@ -15,7 +15,7 @@
 
 - 对业务只暴露 `track`、`identify`、`page`、`setConsent`、`flush`、`disable` 六个概念；
 - `track`、`identify`、`page` 仅执行本地校验和有界内存入队，不调用或等待网络与磁盘；
-- Browser 使用 Umami Tracker，Node/.NET/Python 使用 `/api/batch`；
+- Browser 使用 Formami Tracker，Node/.NET/Python 使用 `/api/batch`；
 - 后台发送使用短超时、有限指数退避和抖动、最大重试次数与最大事件年龄；
 - 队列满时丢弃最旧事件并只报告受控诊断码；
 - Consent 非 `granted` 时拒绝采集；撤回时清空队列、身份和持久文件；
@@ -25,7 +25,9 @@
 
 ## 异步与故障语义
 
-业务调用返回 `accepted` 只表示事件通过本地规则并进入队列，不表示 Umami 已接收。网络错误不会抛给业务层。诊断回调也被隔离，回调自身异常会被吞掉。
+业务调用返回 `accepted` 只表示事件通过本地规则并进入队列，不表示 Formami 已接收。网络错误不会抛给业务层。诊断回调也被隔离，回调自身异常会被吞掉。
+
+Web 的存储兼容键仅在初始化、Consent 切换和 `disable` 时更新。事件热路径只校验、更新内存身份/队列并调度微任务；Tracker 加载失败后的重试由微任务执行，不在 `track`、`identify`、`page` 中读取存储、操作 DOM 或发送请求。微任务执行前重新检查 Consent，撤回或关闭后不再启动待执行的加载重试。
 
 `flush`/`close` 是唯一允许等待的生命周期操作。默认 HTTP Transport 受超时约束；宿主不得在业务热路径等待刷新。进程突然终止时，Browser/Node 内存事件可以丢失，这是“不影响主流程”的主动取舍。
 

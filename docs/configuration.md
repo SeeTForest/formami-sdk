@@ -1,6 +1,8 @@
 # SDK 配置与运行指南
 
-本文是 `@perrin-yong/umami-sdk` 的配置参考。事件、身份和隐私语义以 [`analytics-spec.md`](analytics-spec.md) 为准；完整产品接入流程见 [`integration-guide.md`](integration-guide.md)。
+本文中的 `analytics.example.com` / `analytics-cn.example.com` 是通用示例，不是可用服务；实际 Endpoint、区域与 Website ID 必须由宿主产品配置提供。
+
+本文是 `formami-sdk` 的配置参考。事件、身份和隐私语义以 [`analytics-spec.md`](analytics-spec.md) 为准；完整产品接入流程见 [`integration-guide.md`](integration-guide.md)。
 
 ## 1. 安装与入口
 
@@ -8,31 +10,31 @@
 
 | 运行时 | 安装来源 | 安装命令 |
 | --- | --- | --- |
-| Browser / Node / OpenCode | 公共 npm | `npm install --save-exact @perrin-yong/umami-sdk@0.1.1` |
-| .NET 8 Desktop / 服务 | SDK Release 构建出的私有 `.nupkg` | `dotnet add package Pystone.Analytics --version 0.1.1 --source <ARTIFACT_DIR>` |
-| Python 3.10+ CLI / Agent | SDK Release 构建出的私有 `.whl` | `python -m pip install <ARTIFACT_DIR>/pystone_analytics-0.1.1-py3-none-any.whl` |
+| Browser / Node / OpenCode | npm Registry；固定版本安装 | `npm install --save-exact @seetheforest/formami-sdk@0.1.2` |
+| .NET 8 Desktop / 服务 | SDK Release 构建出的私有 `.nupkg` | `dotnet add package Pystone.Analytics --version 0.1.2 --source <ARTIFACT_DIR>` |
+| Python 3.10+ CLI / Agent | SDK Release 构建出的私有 `.whl` | `python -m pip install <ARTIFACT_DIR>/pystone_analytics-0.1.2-py3-none-any.whl` |
 
 不要尝试从 npm 安装 .NET/Python，也不要假装 `Pystone.Analytics` 已发布到 NuGet.org 或 `pystone-analytics` 已发布到 PyPI。生成内部制品时，在固定 SDK Tag/Commit 上运行 `./tools/build-sdk.ps1`，记录脚本输出的 SHA-256，再把制品复制到产品的私有制品位置。
 
 ```bash
-npm install --save-exact @perrin-yong/umami-sdk@0.1.1
+npm install --save-exact @seetheforest/formami-sdk@0.1.2
 ```
 
 包只提供显式子路径，不提供根入口：
 
 ```ts
-import { createWebAnalytics } from '@perrin-yong/umami-sdk/web';
+import { createWebAnalytics } from '@seetheforest/formami-sdk/web';
 import {
   createInstallationId,
   createNodeAnalytics,
   deriveInstallationSubjectId,
   deriveUserSubjectId,
-} from '@perrin-yong/umami-sdk/node';
+} from '@seetheforest/formami-sdk/node';
 ```
 
-- `/web`：Browser、SPA 和 SSR 的客户端部分；只在 Consent 为 `granted` 后加载 Umami Tracker。
+- `/web`：Browser、SPA 和 SSR 的客户端部分；只在 Consent 为 `granted` 后加载 Formami Tracker。
 - `/node`：Node 服务、CLI、Agent 和经过兼容验证的 OpenCode/Bun 插件；后台批量调用 `/api/batch`。
-- `/core`：共享类型和策略组件。普通产品不应直接用它构造 Umami Payload。
+- `/core`：共享类型和策略组件。普通产品不应直接用它构造 Formami Payload。
 
 包是 ESM、目标 ES2022，要求 Node.js `18.18+`。运行时第三方依赖为零。
 
@@ -55,8 +57,8 @@ import {
 Endpoint 与 Website ID 必须由产品环境配置注入，不写死在业务模块：
 
 ```text
-产品部署在中国大陆 ECS  → https://umami-cn.pystone.net
-产品部署在海外 VPS       → https://umami.pystone.net
+产品部署在中国大陆 ECS  → https://analytics-cn.example.com
+产品部署在海外 VPS       → https://analytics.example.com
 ```
 
 路由按产品部署归属固定，不按终端用户 IP 动态切换。Production 与 Staging 使用不同 Website ID；Website ID 不是 Secret，但不能跨产品或环境误用。
@@ -65,7 +67,7 @@ Endpoint 与 Website ID 必须由产品环境配置注入，不写死在业务�
 
 ```dotenv
 ANALYTICS_ENABLED=true
-ANALYTICS_ENDPOINT=https://umami.pystone.net
+ANALYTICS_ENDPOINT=https://analytics.example.com
 ANALYTICS_WEBSITE_ID=00000000-0000-4000-8000-000000000000
 ANALYTICS_ENVIRONMENT=production
 ANALYTICS_CHANNEL=direct
@@ -77,8 +79,8 @@ Browser 构建工具会把公开前缀的环境变量打入前端包。这里只
 
 | 字段 | 必填 | 规则与建议 |
 | --- | --- | --- |
-| `endpoint` | 是 | 只接受 HTTPS Origin，例如 `https://umami.pystone.net`；不能带路径、Query、Fragment 或凭据。仅显式开启时允许本机 HTTP。 |
-| `websiteId` | 是 | Umami 生成的 canonical RFC 4122 Website UUID；Nil/占位 UUID 无效；每个产品/环境独立。 |
+| `endpoint` | 是 | 只接受 HTTPS Origin，例如 `https://analytics.example.com`；不能带路径、Query、Fragment 或凭据。仅显式开启时允许本机 HTTP。 |
+| `websiteId` | 是 | Formami 生成的 canonical RFC 4122 Website UUID；Nil/占位 UUID 无效；每个产品/环境独立。 |
 | `hostname` | 是 | 稳定的受控主机名，不放用户、Workspace 或设备信息。Desktop/CLI 可用 `desktop.local`、`cli.local`。 |
 | `product` | 是 | 最长 64 字符的小写受控 slug，例如 `my-product`。 |
 | `environment` | 是 | 受控 slug，例如 `production`、`staging`。 |
@@ -99,7 +101,7 @@ Browser 构建工具会把公开前缀的环境变量打入前端包。这里只
 ## 4. Browser 配置
 
 ```ts
-import { createWebAnalytics } from '@perrin-yong/umami-sdk/web';
+import { createWebAnalytics } from '@seetheforest/formami-sdk/web';
 
 export const analytics = createWebAnalytics({
   endpoint: import.meta.env.VITE_ANALYTICS_ENDPOINT,
@@ -125,7 +127,7 @@ export const analytics = createWebAnalytics({
 | Browser 选项 | 默认值 | 边界 |
 | --- | --- | --- |
 | `domains` | `[hostname]` | 最多 100 个合法主机名。 |
-| `autoTrack` | `true` | 是否由 Umami Tracker 自动记录页面访问。 |
+| `autoTrack` | `true` | 是否由 Formami Tracker 自动记录页面访问。 |
 | `allowUtm` | `false` | 开启后也只保留 Policy allowlist 中的 UTM 参数；Fragment 永远移除。 |
 | `performance` | `false` | 仅确有性能分析需求时开启。 |
 | `queueCapacity` | `100` | `1..10000`；满时丢弃最旧事件。 |
@@ -145,7 +147,7 @@ analytics.track('signup_started', { entry_point: 'pricing' });
 analytics.setConsent('withdrawn');
 ```
 
-不要在页面导航、点击或渲染热路径 `await analytics.flush()`。`track()`、`page()`、`identify()` 的返回值只表示本地校验/入队结果，不表示 Umami 已持久化。
+不要在页面导航、点击或渲染热路径 `await analytics.flush()`。`track()`、`page()`、`identify()` 的返回值只表示本地校验/入队结果，不表示 Formami 已持久化。
 
 ## 5. Node、CLI、Agent 与插件配置
 
@@ -154,7 +156,7 @@ import {
   createInstallationId,
   createNodeAnalytics,
   deriveInstallationSubjectId,
-} from '@perrin-yong/umami-sdk/node';
+} from '@seetheforest/formami-sdk/node';
 
 const installationId = loadInstallationId() ?? createInstallationId();
 saveInstallationIdPrivately(installationId);
@@ -167,7 +169,7 @@ const analytics = createNodeAnalytics({
   environment: process.env.ANALYTICS_ENVIRONMENT ?? 'production',
   surface: 'cli',
   productVersion: APP_VERSION,
-  userAgent: `MyProduct/${APP_VERSION} UmamiSdk/0.1.1`,
+  userAgent: `MyProduct/${APP_VERSION} FormamiSdk/0.1.2`,
   initialConsent: loadAnalyticsConsent(),
   platform: process.platform,
   architecture: process.arch,
@@ -190,7 +192,7 @@ if (loadAnalyticsConsent() === 'granted') {
 
 | Node 选项 | 默认值 | 边界 |
 | --- | --- | --- |
-| `userAgent` | 必填 | 1–200 字符，不能包含 CR/LF；Umami 服务端事件需要有效 User-Agent。 |
+| `userAgent` | 必填 | 1–200 字符，不能包含 CR/LF；Formami 服务端事件需要有效 User-Agent。 |
 | `queueCapacity` | `1000` | `1..10000`。 |
 | `batchSize` | `25` | `1..100`。 |
 | `flushIntervalMs` | `5000` | 最小 250 ms。高频 Hook 应先在业务层聚合/采样。 |
@@ -228,7 +230,7 @@ await using var analytics = new AnalyticsClient(new AnalyticsOptions
     Environment = "production",
     Surface = "desktop",
     ProductVersion = ProductVersion.Current,
-    UserAgent = $"MyProduct/{ProductVersion.Current} UmamiSdk/0.1.1",
+    UserAgent = $"MyProduct/{ProductVersion.Current} FormamiSdk/0.1.2",
     InitialConsent = restoredConsent,
     Platform = "windows",
     Architecture = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant(),
@@ -263,7 +265,7 @@ analytics = AnalyticsClient(AnalyticsConfig(
     environment="production",
     surface="cli",
     product_version=PRODUCT_VERSION,
-    user_agent=f"MyProduct/{PRODUCT_VERSION} UmamiSdk/0.1.1",
+    user_agent=f"MyProduct/{PRODUCT_VERSION} FormamiSdk/0.1.2",
     initial_consent=restored_consent,
     platform="windows",
     persistent_queue_path=Path(product_private_data_dir) / "analytics-queue.json",
@@ -285,7 +287,7 @@ analytics = AnalyticsClient(AnalyticsConfig(
 
 ## 8. Identity
 
-- 匿名网站访客：不要主动设置长期 ID，使用 Umami 无 Cookie Session。
+- 匿名网站访客：不要主动设置长期 ID，使用 Formami 无 Cookie Session。
 - Desktop/CLI/插件：同意后生成本地随机安装 ID；原值只保存在产品私有数据目录，发送 `deriveInstallationSubjectId(product, installationId)`。
 - 登录用户：只在可信后端使用 `deriveUserSubjectId(productKey, internalUserId)`；`productKey` 接受标准 `Uint8Array`（Node `Buffer` 兼容）、至少 32 字节，且不能进入前端、Desktop、CLI 或插件。
 - 退出或切换账户：撤销旧 Subject，清空队列并重新建立匿名/安装身份。不要在共享 Node Client 上交替处理多个账户。
@@ -324,7 +326,7 @@ if (!result.accepted && process.env.NODE_ENV !== 'production') {
 
 - Staging 与 Production Website ID 已隔离。
 - `unknown`、`denied`、`withdrawn` 状态下没有请求。
-- 断网、慢网、429、5xx 和 Umami 停机不改变业务结果或退出码。
+- 断网、慢网、429、5xx 和 Formami 停机不改变业务结果或退出码。
 - URL 没有 Query Secret、Email、用户 ID、Token 或动态路径标识。
 - 登录、退出、切换账户和重装身份行为符合产品设计。
 - 固定 SDK 版本，不依赖 `latest` 做不可控升级。

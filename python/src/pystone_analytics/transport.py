@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 from .models import AnalyticsConfig, AnalyticsTransport, TransportOutcome, TransportResult
 
 
-class UmamiHttpTransport(AnalyticsTransport):
+class FormamiHttpTransport(AnalyticsTransport):
     _MAX_RESPONSE_BYTES = 64 * 1024
     def __init__(self, config: AnalyticsConfig) -> None:
         self._url = f"{config.endpoint.rstrip('/')}/api/batch"
@@ -29,6 +29,7 @@ class UmamiHttpTransport(AnalyticsTransport):
             "User-Agent": self._user_agent,
         }
         if self._cache:
+            headers["x-formami-cache"] = self._cache
             headers["x-umami-cache"] = self._cache
         request = Request(
             self._url,
@@ -97,3 +98,6 @@ class UmamiHttpTransport(AnalyticsTransport):
             return min(max((date - datetime.now(timezone.utc)).total_seconds(), 0.0), 60.0)
         except (TypeError, ValueError, OverflowError):
             return None
+
+# Compatibility import for existing consumers.
+UmamiHttpTransport = FormamiHttpTransport

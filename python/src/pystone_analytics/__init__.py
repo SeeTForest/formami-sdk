@@ -12,7 +12,7 @@ from .models import (
     TransportOutcome,
     TransportResult,
 )
-from .transport import UmamiHttpTransport
+from .transport import FormamiHttpTransport, UmamiHttpTransport
 
 __all__ = [
     "AnalyticsClient",
@@ -22,6 +22,7 @@ __all__ = [
     "TrackResult",
     "TransportOutcome",
     "TransportResult",
+    "FormamiHttpTransport",
     "UmamiHttpTransport",
     "create_installation_id",
     "derive_installation_subject_id",

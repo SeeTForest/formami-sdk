@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { UmamiRequest } from '../core/index.js';
+import type { FormamiRequest } from '../core/index.js';
 import {
   deriveInstallationSubjectId,
   deriveUserSubjectId,
@@ -11,11 +11,11 @@ import {
 import { baseConfig } from './helpers.js';
 
 class FakeTransport implements AnalyticsTransport {
-  readonly batches: UmamiRequest[][] = [];
+  readonly batches: FormamiRequest[][] = [];
   readonly results: TransportResult[] = [];
   resets = 0;
 
-  async send(requests: UmamiRequest[]): Promise<TransportResult> {
+  async send(requests: FormamiRequest[]): Promise<TransportResult> {
     this.batches.push(requests);
     return this.results.shift() ?? { kind: 'success' };
   }
@@ -29,7 +29,7 @@ test('does not accept before consent and flushes after grant', async () => {
   const transport = new FakeTransport();
   const client = new NodeAnalyticsClient({
     ...baseConfig(),
-    userAgent: 'Test/1.0 Analytics/0.1.1',
+    userAgent: 'Test/1.0 Analytics/0.1.2',
     transport,
     flushIntervalMs: 60_000,
   });
@@ -49,7 +49,7 @@ test('retries retryable transport results without blocking callers', async () =>
   let now = 1_000;
   const client = new NodeAnalyticsClient({
     ...baseConfig({ initialConsent: 'granted' }),
-    userAgent: 'Test/1.0 Analytics/0.1.1',
+    userAgent: 'Test/1.0 Analytics/0.1.2',
     transport,
     flushIntervalMs: 60_000,
     retryBaseMs: 100,
@@ -75,7 +75,7 @@ test('track only enqueues and never invokes a blocked transport inline', async (
   };
   const client = new NodeAnalyticsClient({
     ...baseConfig({ initialConsent: 'granted' }),
-    userAgent: 'Test/1.0 Analytics/0.1.1',
+    userAgent: 'Test/1.0 Analytics/0.1.2',
     transport,
     flushIntervalMs: 60_000,
   });
@@ -93,7 +93,7 @@ test('withdrawal clears identity and queued events', async () => {
   const transport = new FakeTransport();
   const client = new NodeAnalyticsClient({
     ...baseConfig({ initialConsent: 'granted' }),
-    userAgent: 'Test/1.0 Analytics/0.1.1',
+    userAgent: 'Test/1.0 Analytics/0.1.2',
     transport,
     flushIntervalMs: 60_000,
   });
@@ -107,11 +107,11 @@ test('withdrawal clears identity and queued events', async () => {
   await client.close();
 });
 
-test('subject switch drops the old queue and resets the Umami session cache', async () => {
+test('subject switch drops the old queue and resets the Formami session cache', async () => {
   const transport = new FakeTransport();
   const client = new NodeAnalyticsClient({
     ...baseConfig({ initialConsent: 'granted' }),
-    userAgent: 'Test/1.0 Analytics/0.1.1',
+    userAgent: 'Test/1.0 Analytics/0.1.2',
     transport,
     flushIntervalMs: 60_000,
   });

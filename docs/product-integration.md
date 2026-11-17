@@ -1,25 +1,27 @@
-# Umami 使用与产品接入手册
+# Formami 使用与产品接入手册
 
-本文是本工程的主要使用文档，适用于当前固定的 Umami `3.3.0` Fork，覆盖：
+本文中的 `analytics.example.com` / `analytics-cn.example.com` 是通用示例，不是可用服务；实际 Endpoint、区域与 Website ID 必须由宿主产品配置提供。
 
-- 在 Umami 后台创建产品数据空间；
+本文是本工程的主要使用文档，后台功能说明基于改名前的 Umami `3.3.0` Fork；Formami 的具体后台版本与功能由宿主部署验收确认，覆盖：
+
+- 在 Formami 后台创建产品数据空间；
 - 为产品选择中国大陆或海外实例；
 - 接入网站、Node.js 后端、OpenCode 插件、Windows Desktop 和 Python CLI；
 - 调用页面、事件、Identify、Session Properties、批量发送、Revenue 和 Performance 等能力；
 - 在后台建立 Goal、Funnel、Journey、Retention、Attribution 和 Board；
 - 按本工程规则处理身份、Consent、隐私、失败降级和上线验收。
 
-> Umami 后台把一个分析项目称为 **Website**。本文中的“项目”“数据空间”和“Website”指同一个 Umami 对象，不表示代码仓库，也不要求接入对象一定是真实网站。
+> Formami 后台把一个分析项目称为 **Website**。本文中的“项目”“数据空间”和“Website”指同一个 Formami 对象，不表示代码仓库，也不要求接入对象一定是真实网站。
 
-如果接入工作由产品研发 LLM Agent 执行，应把 [`integration-guide.md`](integration-guide.md) 作为主执行规范，并在产品仓库填写 [`product-integration-template.md`](product-integration-template.md)。本文继续作为 Umami 后台创建、原生 API 和 Dashboard 功能参考。
+如果接入工作由产品研发 LLM Agent 执行，应把 [`integration-guide.md`](integration-guide.md) 作为主执行规范，并在产品仓库填写 [`product-integration-template.md`](product-integration-template.md)。本文继续作为 Formami 后台创建、原生 API 和 Dashboard 功能参考。
 
 ## 1. 先理解四个对象
 
 | 对象 | 在本工程中的含义 | 示例 |
 | --- | --- | --- |
-| Umami 实例 | 数据实际写入的区域服务 | `https://umami-cn.pystone.net` |
+| Formami 实例 | 数据实际写入的区域服务 | `https://analytics-cn.example.com` |
 | Website | 一个产品、环境、身份和隐私边界 | `my-product-production` |
-| Session | Umami 根据 Website、IP、User-Agent 等生成的无 Cookie 会话 | 一次网站访问或产品运行期 |
+| Session | Formami 根据 Website、IP、User-Agent 等生成的无 Cookie 会话 | 一次网站访问或产品运行期 |
 | Distinct ID | 产品主动提供的伪名用户/安装标识 | HMAC 或 SHA-256 派生值 |
 
 一个产品接入前必须先回答：
@@ -39,15 +41,15 @@ policy_version
 建议将公开配置写进产品的环境配置，将密钥留在可信环境：
 
 ```dotenv
-UMAMI_ENDPOINT=https://umami.pystone.net
-UMAMI_WEBSITE_ID=<WEBSITE_ID>
+FORMAMI_ENDPOINT=https://analytics.example.com
+FORMAMI_WEBSITE_ID=<WEBSITE_ID>
 ANALYTICS_PRODUCT=my-product
 ANALYTICS_ENVIRONMENT=production
 ANALYTICS_SURFACE=web
 ANALYTICS_POLICY_VERSION=1
 ```
 
-`UMAMI_ENDPOINT` 和 `UMAMI_WEBSITE_ID` 不是 Secret，可以进入客户端构建产物。管理员密码、管理 API Token、HMAC Key 和数据库凭据是 Secret，不得进入客户端或 Git。
+`FORMAMI_ENDPOINT` 和 `FORMAMI_WEBSITE_ID` 不是 Secret，可以进入客户端构建产物。管理员密码、管理 API Token、HMAC Key 和数据库凭据是 Secret，不得进入客户端或 Git。
 
 ## 2. 选择实例和 Website 边界
 
@@ -55,8 +57,8 @@ ANALYTICS_POLICY_VERSION=1
 
 | 产品部署归属 | Endpoint | 后台地址 |
 | --- | --- | --- |
-| 中国大陆 ECS | `https://umami-cn.pystone.net` | [中国大陆 Umami](https://umami-cn.pystone.net) |
-| 海外 VPS | `https://umami.pystone.net` | [海外 Umami](https://umami.pystone.net) |
+| 中国大陆 ECS | `https://analytics-cn.example.com` | [中国大陆 Formami](https://analytics-cn.example.com) |
+| 海外 VPS | `https://analytics.example.com` | [海外 Formami](https://analytics.example.com) |
 
 路由规则：
 
@@ -94,7 +96,7 @@ my-editor-staging
 
 ### 3.1 创建 Production Website
 
-1. 打开目标区域的 Umami 后台并使用自己的管理员账号登录。
+1. 打开目标区域的 Formami 后台并使用自己的管理员账号登录。
 2. 在左侧进入 **Websites**。
 3. 点击右上角 **Add website**。
 4. 填写：
@@ -125,7 +127,7 @@ staging.desktop.my-editor.invalid
 
 ```yaml
 name: my-editor-production
-endpoint: https://umami.pystone.net
+endpoint: https://analytics.example.com
 website_id: 00000000-0000-0000-0000-000000000000
 product: my-editor
 environment: production
@@ -158,7 +160,7 @@ Content-Type: application/json
 
 ## 4. 统一 Adapter：业务代码只用六个方法
 
-业务层不要直接构造 Umami Payload。本仓库在 `typescript/`、`dotnet/` 和 `python/` 提供 Browser/Node、.NET 和 Python 薄 SDK，各语言暴露同一组语义：
+业务层不要直接构造 Formami Payload。本仓库在 `typescript/`、`dotnet/` 和 `python/` 提供 Browser/Node、.NET 和 Python 薄 SDK，各语言暴露同一组语义：
 
 ```text
 track(eventName, properties)
@@ -169,16 +171,16 @@ flush()
 disable()
 ```
 
-| 方法 | 业务语义 | Umami 映射 |
+| 方法 | 业务语义 | Formami 映射 |
 | --- | --- | --- |
-| `track` | 记录已经发生的业务事实 | Web `umami.track(name, data)` 或 `POST /api/send` |
-| `identify` | 设置伪名 Distinct ID 和受控 Session Properties | Web `umami.identify()` 或 `type=identify` |
+| `track` | 记录已经发生的业务事实 | Web `formami.track(name, data)` 或 `POST /api/send` |
+| `identify` | 设置伪名 Distinct ID 和受控 Session Properties | Web `formami.identify()` 或 `type=identify` |
 | `page` | 记录规范化页面访问 | Tracker 自动 Pageview 或无 `name` 的 `type=event` |
-| `setConsent` | 切换 Analytics 同意状态 | 本工程 Adapter 能力，不是 Umami 原生方法 |
+| `setConsent` | 切换 Analytics 同意状态 | 本工程 Adapter 能力，不是 Formami 原生方法 |
 | `flush` | 尝试发送有界队列 | 本工程 Adapter 能力；可映射 `/api/batch` |
 | `disable` | 停止发送、清队列、清身份 | 本工程 Adapter 能力 |
 
-SDK 的返回值只表示本地是否接受，不表示 Umami 已接收：
+SDK 的返回值只表示本地是否接受，不表示 Formami 已接收：
 
 ```ts
 export type ConsentState = 'unknown' | 'granted' | 'denied' | 'withdrawn';
@@ -195,7 +197,7 @@ export interface AnalyticsClient {
 }
 ```
 
-`track`、`identify`、`page` 只执行同步的本地校验和有界内存入队，不等待网络或磁盘。Web 在下一微任务调用 Tracker；Node/.NET/Python 由后台 Worker 批量发送。DNS、TLS、超时、429、5xx 和 Umami 停机只影响 Analytics 队列，不得改变页面、命令退出码、业务返回值或事务。
+`track`、`identify`、`page` 只执行同步的本地校验和有界内存入队，不等待网络或磁盘。Web 在下一微任务调用 Tracker；Node/.NET/Python 由后台 Worker 批量发送。DNS、TLS、超时、429、5xx 和 Formami 停机只影响 Analytics 队列，不得改变页面、命令退出码、业务返回值或事务。
 
 `flush` 只用于测试或受控退出，并受短截止时间约束；不能在渲染、保存、命令执行、支付或其他业务热路径中等待。队列超限、重试耗尽、事件过期或进程突然终止时允许丢弃 Analytics。
 
@@ -209,12 +211,12 @@ consent_state, policy_version
 
 产品业务代码只提供事件特有属性，例如 `feature`、`result`、`error_category` 和 `duration_bucket`。
 
-TypeScript/Browser/Node 从公共 npm 安装精确版本；.NET/Python 当前从固定 SDK Tag/Commit 运行 `.\tools\build-sdk.ps1` 后，使用 `artifacts/sdk/` 中的内部制品：
+TypeScript/Browser/Node 通过 npm 安装固定版本；.NET/Python 从固定 SDK Tag/Commit 运行 `.\tools\build-sdk.ps1` 后，使用 `artifacts/sdk/` 中的内部制品：
 
 ```powershell
-npm install --save-exact @perrin-yong/umami-sdk@0.1.1
-dotnet add package Pystone.Analytics --version 0.1.1 --source <PATH_TO_ARTIFACTS>
-python -m pip install <PATH_TO_ARTIFACTS>\pystone_analytics-0.1.1-py3-none-any.whl
+npm install --save-exact @seetheforest/formami-sdk@0.1.2
+dotnet add package Pystone.Analytics --version 0.1.2 --source <PATH_TO_ARTIFACTS>
+python -m pip install <PATH_TO_ARTIFACTS>\pystone_analytics-0.1.2-py3-none-any.whl
 ```
 
 npm 产品提交 lockfile；.NET/Python 产品记录制品 SHA-256。不要把根工程的移动分支或源码目录作为产品构建时的依赖，也不要假定 `.nupkg`/`.whl` 已发布到公共 Registry。升级 SDK 时同时审阅事件 Schema/Policy 变化并先在 Staging 验证。
@@ -235,7 +237,7 @@ unknown ──► granted ──► withdrawn
 | `denied` | 不发送，不影响产品基本功能 |
 | `withdrawn` | 立即停止、清空队列、删除本地分析 ID 和本产品保存的分析状态 |
 
-`disable()` 必须是本地立即生效操作，不能依赖 Umami 服务可达。重新同意后，Desktop/CLI 应生成新的安装分析 ID。
+`disable()` 必须是本地立即生效操作，不能依赖 Formami 服务可达。重新同意后，Desktop/CLI 应生成新的安装分析 ID。
 
 ## 6. 网站接入 Web Tracker
 
@@ -244,10 +246,10 @@ unknown ──► granted ──► withdrawn
 不要在 HTML 初始内容中无条件加载 Tracker。创建 SDK 实例时保持 `unknown`；只有用户同意后才加载脚本：
 
 ```ts
-import { createWebAnalytics } from '@perrin-yong/umami-sdk/web';
+import { createWebAnalytics } from '@seetheforest/formami-sdk/web';
 
 export const analytics = createWebAnalytics({
-  endpoint: 'https://umami.pystone.net',
+  endpoint: 'https://analytics.example.com',
   websiteId: '<PRODUCTION_WEBSITE_ID>',
   hostname: 'www.example.com',
   product: 'my-product',
@@ -273,9 +275,9 @@ SDK 会配置 Tracker 的 `domains`、DNT、Query/Fragment 清洗和 `beforeSend
 ```html
 <script
   defer
-  src="https://umami.pystone.net/script.js"
+  src="https://analytics.example.com/script.js"
   data-website-id="<WEBSITE_ID>"
-  data-host-url="https://umami.pystone.net"
+  data-host-url="https://analytics.example.com"
   data-domains="example.com,www.example.com"
   data-exclude-search="true"
   data-exclude-hash="true"
@@ -284,7 +286,7 @@ SDK 会配置 Tracker 的 `domains`、DNT、Query/Fragment 清洗和 `beforeSend
 </script>
 ```
 
-中国大陆产品把两个 `umami.pystone.net` 地址替换为 `umami-cn.pystone.net`。
+中国大陆产品把两个 `analytics.example.com` 地址替换为 `analytics-cn.example.com`。
 
 ### 6.3 Pageview 与 SPA
 
@@ -305,7 +307,7 @@ analytics.page({
 
 不要发送 `location.href`，也不要把 Token、Email、订单号或用户 ID 放进 URL Path。
 
-Next.js 应在客户端组件中加载脚本，并在 Consent 确认后启用。不要在服务端渲染阶段访问 `window.umami`。
+Next.js 应在客户端组件中加载脚本，并在 Consent 确认后启用。不要在服务端渲染阶段访问 `window.formami`。
 
 ## 7. Web 事件调用
 
@@ -318,17 +320,17 @@ analytics.track('download_clicked', {
 });
 ```
 
-事件名使用小写 `snake_case`，描述已经发生的事实。SDK 使用比 Umami 服务端更严格的本地上限和字段 allowlist，并自动注入公共上下文。调用同步返回，不要 `await`。
+事件名使用小写 `snake_case`，描述已经发生的事实。SDK 使用比 Formami 服务端更严格的本地上限和字段 allowlist，并自动注入公共上下文。调用同步返回，不要 `await`。
 
 ### 7.2 不使用 HTML 声明式事件
 
-本工程接入 SDK 后，不使用 `data-umami-event`：
+本工程接入 SDK 后，不使用 `data-formami-event`：
 
 ```html
 <button
-  data-umami-event="download_clicked"
-  data-umami-event-artifact_type="windows_installer"
-  data-umami-event-channel="homepage">
+  data-formami-event="download_clicked"
+  data-formami-event-artifact_type="windows_installer"
+  data-formami-event-channel="homepage">
   下载 Windows 版
 </button>
 ```
@@ -360,7 +362,7 @@ subject_id = Base64URL(HMAC-SHA256(product_key, internal_user_id))
 Node.js 可信后端使用 SDK 身份工具和至少 32 字节的产品独立 Key：
 
 ```ts
-import { deriveUserSubjectId } from '@perrin-yong/umami-sdk/node';
+import { deriveUserSubjectId } from '@seetheforest/formami-sdk/node';
 
 export function analyticsSubjectId(productKey: Buffer, internalUserId: string) {
   return deriveUserSubjectId(productKey, internalUserId);
@@ -377,7 +379,7 @@ analytics.identify('<PSEUDONYMOUS_ID>', {
 });
 ```
 
-Umami 会把同一 Website 内相同 Distinct ID 的多个 Session 展示到关联时间线，但不会把这些 Session 合并成一个 Session，也不会跨 Website 自动建立统一画像。
+Formami 会把同一 Website 内相同 Distinct ID 的多个 Session 展示到关联时间线，但不会把这些 Session 合并成一个 Session，也不会跨 Website 自动建立统一画像。
 
 官方接口技术上允许任意 Session Data；本工程明确禁止发送 Email、姓名、手机号和裸数据库 ID。
 
@@ -399,32 +401,32 @@ subject_id = Base64URL(SHA-256(product_scope || installation_id))
 - 清空产品 Adapter 中保存的账户 ID 和待发队列；
 - 网站在退出完成后进行整页重载，再按 Consent 状态重新初始化 Tracker；
 - Desktop/CLI 切回新的安装级身份；
-- Node/.NET/Python SDK 在已识别 Subject 切换或 Consent 撤回时会丢弃旧身份的待发队列并清除 `x-umami-cache`；Web Tracker 的内部缓存必须通过整页重载重建；
+- Node/.NET/Python SDK 在已识别 Subject 切换或 Consent 撤回时会丢弃旧身份的待发队列并清除 `x-formami-cache`（兼容 `x-umami-cache`）；Web Tracker 的内部缓存必须通过整页重载重建；
 - 上线前实测“账户 A → 退出 → 账户 B”和多设备场景；
 - 对身份隔离要求极高的共享设备场景，应评估不在浏览器端调用 Identify，仅由可信后端发送账户级事实。
 
 ## 9. Node.js 后端接入
 
-默认使用本工程 SDK；它比直接调用官方 Node Client 多了统一 Schema、隐私检查、Consent 和后台队列。Node 包从公共 npm 固定精确版本安装：
+默认使用本工程 SDK；它比直接调用官方 Node Client 多了统一 Schema、隐私检查、Consent 和后台队列。Node 使用以下命令安装固定版本：
 
 ```powershell
-npm install --save-exact @perrin-yong/umami-sdk@0.1.1
+npm install --save-exact @seetheforest/formami-sdk@0.1.2
 ```
 
 初始化一次，业务路径不 `await track()`：
 
 ```ts
-import { createNodeAnalytics } from '@perrin-yong/umami-sdk/node';
+import { createNodeAnalytics } from '@seetheforest/formami-sdk/node';
 
 const analytics = createNodeAnalytics({
-  endpoint: process.env.UMAMI_ENDPOINT!,
-  websiteId: process.env.UMAMI_WEBSITE_ID!,
+  endpoint: process.env.FORMAMI_ENDPOINT!,
+  websiteId: process.env.FORMAMI_WEBSITE_ID!,
   hostname: 'api.my-product.invalid',
   product: 'my-product',
   environment: 'production',
   surface: 'backend',
   productVersion: '1.2.0',
-  userAgent: 'MyProduct/1.2.0 UmamiSdk/0.1.1',
+  userAgent: 'MyProduct/1.2.0 FormamiSdk/0.1.2',
   initialConsent: 'granted',
 });
 ```
@@ -450,7 +452,7 @@ analytics.track('operation_completed', {
 ```http
 POST /api/send
 Content-Type: application/json
-User-Agent: MyProduct/1.2.0 Analytics/0.1.1
+User-Agent: MyProduct/1.2.0 Analytics/0.1.2
 ```
 
 完整事件示例：
@@ -470,7 +472,7 @@ User-Agent: MyProduct/1.2.0 Analytics/0.1.1
       "environment": "production",
       "surface": "desktop",
       "product_version": "1.2.0",
-      "sdk_version": "0.1.1",
+      "sdk_version": "0.1.2",
       "platform": "windows",
       "architecture": "x64",
       "feature": "agent_run",
@@ -490,7 +492,7 @@ User-Agent: MyProduct/1.2.0 Analytics/0.1.1
 - `type` 可为 `event`、`identify` 或 `performance`；
 - `name` 存在时是自定义事件，不存在时是 Pageview；非 Web 产品采用 Event-first，不伪造 Pageview；
 - 离线补发可用 `payload.timestamp` 传 Unix 秒，但不要无限期回灌过期事件；
-- 响应中的 `cache` 可在同一客户端运行 Session 的后续请求中通过 `x-umami-cache` 传回；不要跨用户或长期持久化该值。
+- 响应中的 `cache` 可在同一客户端运行 Session 的后续请求中通过 `x-formami-cache`（兼容 `x-umami-cache`） 传回；不要跨用户或长期持久化该值。
 
 Identify 的 HTTP 形式：
 
@@ -540,10 +542,10 @@ Identify 的 HTTP 形式：
 
 ## 11. OpenCode 插件和 Bun
 
-插件优先试用 `@perrin-yong/umami-sdk/node`；它只依赖运行时内置的 `fetch`、Web Crypto/Node Crypto 和计时器。每次 OpenCode/Bun 升级都在 Staging 做加载、断网和退出测试。业务 Hook 只同步入队：
+插件优先试用 `@seetheforest/formami-sdk/node`；它只依赖运行时内置的 `fetch`、Web Crypto/Node Crypto 和计时器。每次 OpenCode/Bun 升级都在 Staging 做加载、断网和退出测试。业务 Hook 只同步入队：
 
 ```ts
-import { createNodeAnalytics } from '@perrin-yong/umami-sdk/node';
+import { createNodeAnalytics } from '@seetheforest/formami-sdk/node';
 
 const analytics = createNodeAnalytics({
   endpoint,
@@ -553,7 +555,7 @@ const analytics = createNodeAnalytics({
   environment,
   surface: 'opencode_plugin',
   productVersion: pluginVersion,
-  userAgent: `MyPlugin/${pluginVersion} UmamiSdk/0.1.1`,
+  userAgent: `MyPlugin/${pluginVersion} FormamiSdk/0.1.2`,
 });
 
 analytics.setConsent('granted');
@@ -579,7 +581,7 @@ await using var analytics = new AnalyticsClient(new AnalyticsOptions
     Environment = "production",
     Surface = "desktop",
     ProductVersion = "1.2.0",
-    UserAgent = "MyProduct/1.2.0 UmamiSdk/0.1.1",
+    UserAgent = "MyProduct/1.2.0 FormamiSdk/0.1.2",
     PersistentQueuePath = Path.Combine(productPrivateDataDirectory, "analytics-queue.json"),
 });
 
@@ -614,7 +616,7 @@ analytics = AnalyticsClient(AnalyticsConfig(
     environment="production",
     surface="cli",
     product_version="1.2.0",
-    user_agent="MyCli/1.2.0 UmamiSdk/0.1.1",
+    user_agent="MyCli/1.2.0 FormamiSdk/0.1.2",
     initial_consent=ConsentState.GRANTED,
     persistent_queue_path=product_private_data_dir / "analytics-queue.json",
 ))
@@ -632,7 +634,7 @@ CLI 默认不因为 Analytics 等待网络。守护线程批量发送；受控�
 
 只有先采对数据，后台功能才有意义：
 
-| Umami 功能 | 所需数据 | 使用方法 | 适合回答 |
+| Formami 功能 | 所需数据 | 使用方法 | 适合回答 |
 | --- | --- | --- | --- |
 | Overview | Pageview 或 Event | 打开 Website，选择日期并用过滤器细分 | 流量、来源、页面、设备、地区、版本 |
 | Realtime | 新鲜 Pageview/Event | Website → Realtime | 部署后事件是否立刻到达 |
@@ -687,13 +689,13 @@ Journey 用于探索用户路径，不要求预先规定每个中间步骤。设
 
 ### 14.4 Retention
 
-Umami 原生 Retention 按“首次访问日”建立 Cohort，并观察之后每日是否返回。它不是可自由选择 `activation_event` 的高级 Cohort 引擎。
+Formami 原生 Retention 按“首次访问日”建立 Cohort，并观察之后每日是否返回。它不是可自由选择 `activation_event` 的高级 Cohort 引擎。
 
 因此：
 
 - 网站可用它观察访客回访；
 - Event-first 产品的首次有效事件会形成首次访问，但应保证 `product_started` 不是唯一活跃定义；
-- 要严格计算“激活后的 D1/D7/D30”时，使用 Umami API/导出数据按 Distinct ID 和事件时间计算，并在指标说明中写明身份范围与窗口。
+- 要严格计算“激活后的 D1/D7/D30”时，使用 Formami API/导出数据按 Distinct ID 和事件时间计算，并在指标说明中写明身份范围与窗口。
 
 ### 14.5 Revenue
 
@@ -708,7 +710,7 @@ backendAnalytics.track('purchase_completed', {
 });
 ```
 
-正式付款完成事件应由支付回调后的可信后端发送。Umami 用于行为与归因分析，账务金额仍以产品数据库和支付平台为准。
+正式付款完成事件应由支付回调后的可信后端发送。Formami 用于行为与归因分析，账务金额仍以产品数据库和支付平台为准。
 
 ### 14.6 Performance
 
@@ -734,7 +736,7 @@ Performance 只适用于真实网页体验。在取得 Consent 后启用 `data-p
 
 ### 14.8 Links 与 Pixels（按需）
 
-- **Links**：左侧进入 Links → Add link，填写目标地址后使用 Umami 生成的 `/l/...` 跳转链接，适合营销活动、社交媒体和邮件链接点击统计。
+- **Links**：左侧进入 Links → Add link，填写目标地址后使用 Formami 生成的 `/l/...` 跳转链接，适合营销活动、社交媒体和邮件链接点击统计。
 - **Pixels**：左侧进入 Pixels → Add pixel，把生成的像素代码用于不支持 JavaScript 的页面或邮件打开统计。
 
 这两项会引入额外的重定向或邮件追踪。只有在隐私政策、Consent、邮件合规和业务价值明确后启用；产品内部功能事件仍使用 Website Event，不用 Link/Pixel 代替。
@@ -820,7 +822,7 @@ Email、手机号、姓名和精确地址
 精确地理位置和敏感个人特征
 ```
 
-当前 Umami 版本具备 Session Replay 和 Heatmap 配置，但本工程默认禁用。Replay 会涉及屏幕/DOM 内容，违反当前禁采边界；Heatmap 也必须先完成单独的隐私、采样、选择器和 Consent 评审，不能为了“功能完整”直接开启。
+当前 Formami 版本具备 Session Replay 和 Heatmap 配置，但本工程默认禁用。Replay 会涉及屏幕/DOM 内容，违反当前禁采边界；Heatmap 也必须先完成单独的隐私、采样、选择器和 Consent 评审，不能为了“功能完整”直接开启。
 
 ## 18. 上线验收：合成用户完整走一遍
 
@@ -883,7 +885,7 @@ Email、手机号、姓名和精确地址
 
 ### 数据重复
 
-SDK 的本地 `event_id` 只用于队列和诊断，不上传到 Umami，也不能假定 Umami 自动去重。队列应使用明确的发送状态并限制重试；关键业务金额和订单仍由业务数据库去重和核算。
+SDK 的本地 `event_id` 只用于队列和诊断，不上传到 Formami，也不能假定 Formami 自动去重。队列应使用明确的发送状态并限制重试；关键业务金额和订单仍由业务数据库去重和核算。
 
 ## 20. 官方资料
 
@@ -910,4 +912,4 @@ SDK 的本地 `event_id` 只用于队列和诊断，不上传到 Umami，也不�
 - [Pixels](https://docs.umami.is/docs/pixels)
 - [Website Statistics API](https://docs.umami.is/docs/api/website-stats)
 
-更严格的事件、身份、Consent 和隐私规则见 [`analytics-spec.md`](analytics-spec.md)。Umami 服务部署和升级由宿主基础设施工程负责，不属于 SDK 仓库职责。
+更严格的事件、身份、Consent 和隐私规则见 [`analytics-spec.md`](analytics-spec.md)。Formami 服务部署和升级由宿主基础设施工程负责，不属于 SDK 仓库职责。

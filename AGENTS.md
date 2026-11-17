@@ -2,7 +2,9 @@
 
 ## 项目定位
 
-本目录是独立的 Umami Analytics SDK 工程。它为 Browser、Node/OpenCode、Windows Desktop 和 Python CLI/Agent 提供一致的薄 Adapter，将产品事件安全、异步地映射到 Umami。
+本目录是独立的 Formami Analytics SDK 工程。它为 Browser、Node/OpenCode、Windows Desktop 和 Python CLI/Agent 提供一致的薄 Adapter，将产品事件安全、异步地映射到 Formami。
+
+仓库：`git@github.com:SeeTForest/formami-sdk.git`。npm 包名为 `@seetheforest/formami-sdk`；NuGet/Python 包坐标与版本保留；改名不得移除旧公共类型、Tracker、请求头和 Consent 兼容入口。个人 Endpoint、Website 登记、账号和凭据只属于宿主工程配置，不得写入本仓库或分发包。
 
 ## 核心边界
 
@@ -42,6 +44,6 @@ python tests/validate_docs.py
 ## Git 与 Secret
 
 - 不提交构建产物、缓存、Website 私有配置、HMAC Key、Token、Cookie 或真实用户数据。
-- npm 发布坐标固定为 `@perrin-yong/umami-sdk`；发布配置和版本必须通过 `tools/check_version.py`。
+- npm 发布坐标固定为 `@seetheforest/formami-sdk`；发布配置和版本必须通过 `tools/check_version.py`。
 - 尊重现有修改；禁止 `git reset --hard`、强制覆盖或大范围清理工作区。
 - 发布必须固定 SDK、Schema 和 Policy 版本，并记录制品 SHA-256。

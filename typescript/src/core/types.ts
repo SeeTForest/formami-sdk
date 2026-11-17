@@ -108,7 +108,7 @@ export interface AnalyticsClient {
   disable(): void;
 }
 
-export interface UmamiPayload {
+export interface FormamiPayload {
   website: string;
   hostname?: string;
   url?: string;
@@ -119,7 +119,12 @@ export interface UmamiPayload {
   data?: AnalyticsProperties;
 }
 
-export interface UmamiRequest {
+export interface FormamiRequest {
   type: 'event' | 'identify' | 'performance';
-  payload: UmamiPayload;
+  payload: FormamiPayload;
 }
+
+/** @deprecated Use FormamiPayload. */
+export type UmamiPayload = FormamiPayload;
+/** @deprecated Use FormamiRequest. */
+export type UmamiRequest = FormamiRequest;

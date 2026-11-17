@@ -1,19 +1,21 @@
 # 产品 Analytics 接入记录模板
 
+本文中的 `analytics.example.com` / `analytics-cn.example.com` 是通用示例，不是可用服务；实际 Endpoint、区域与 Website ID 必须由宿主产品配置提供。
+
 > 将本文件复制到产品仓库的 `docs/analytics.md`，由负责接入的研发 Agent 填写。不得记录密码、管理 Token、HMAC Key 或其他 Secret。
 
 ## 1. 基本信息
 
 ```yaml
 status: planned                         # planned / staging_verified / production
-sdk_version: 0.1.1
+sdk_version: 0.1.2
 schema_version: 1
 policy_version: 1
 product: <controlled-slug>
 environment: <staging|production>
 surface: <web|desktop|node|opencode_plugin|cli|agent|backend>
 deployment_region: <cn|global>
-endpoint: <https://umami-cn.pystone.net|https://umami.pystone.net>
+endpoint: <https://analytics-cn.example.com|https://analytics.example.com>
 website_name: <product-environment>
 website_id_source: <environment-variable-name>
 hostname: <logical-hostname>
@@ -147,7 +149,7 @@ funnel: <pass/fail>
 retention_setup: <pass/fail>
 consent_network_check: <pass/fail>
 offline_and_slow_network: <pass/fail>
-umami_429_5xx: <pass/fail>
+formami_429_5xx: <pass/fail>
 shutdown_deadline: <pass/fail>
 forbidden_field_sample: <pass/fail>
 production_isolation: <pass/fail>

@@ -6,7 +6,7 @@ namespace Pystone.Analytics;
 internal sealed class QueuedItem
 {
     public required string QueueId { get; init; }
-    public required UmamiRequest Request { get; init; }
+    public required FormamiRequest Request { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public int Attempts { get; set; }
     public DateTimeOffset NextAttemptAt { get; set; }
@@ -37,7 +37,7 @@ public sealed class AnalyticsClient : IAnalyticsClient
     {
         _options = options;
         _policy = new PolicyEngine(options);
-        _transport = transport ?? new UmamiHttpTransport(options);
+        _transport = transport ?? new FormamiHttpTransport(options);
         _ownsTransport = transport is null;
         _consent = options.InitialConsent;
         if (_consent == ConsentState.Granted) LoadQueue();
@@ -294,7 +294,7 @@ public sealed class AnalyticsClient : IAnalyticsClient
         return AnalyticsResult.Rejected(code);
     }
 
-    private void Enqueue(UmamiRequest request, string? eventName = null, string? queueId = null)
+    private void Enqueue(FormamiRequest request, string? eventName = null, string? queueId = null)
     {
         lock (_gate)
         {
@@ -474,7 +474,7 @@ public sealed class AnalyticsClient : IAnalyticsClient
     }
 
     private async Task<TransportResult> SendBatchAsync(
-        IReadOnlyList<UmamiRequest> requests,
+        IReadOnlyList<FormamiRequest> requests,
         CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

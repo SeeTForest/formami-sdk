@@ -10,17 +10,17 @@ import {
   type ConsentState,
   type PageProperties,
   type TrackResult,
-  type UmamiRequest,
+  type FormamiRequest,
 } from '../core/index.js';
 import {
   type AnalyticsTransport,
   type TransportResult,
-  UmamiHttpTransport,
+  FormamiHttpTransport,
 } from './transport.js';
 
 interface QueueItem {
   id: string;
-  request: UmamiRequest;
+  request: FormamiRequest;
   createdAtMs: number;
   attempts: number;
   nextAttemptAtMs: number;
@@ -99,7 +99,7 @@ export class NodeAnalyticsClient implements AnalyticsClient {
     this.consent = config.initialConsent ?? 'unknown';
     this.transport =
       config.transport ??
-      new UmamiHttpTransport({
+      new FormamiHttpTransport({
         endpoint: this.policy.endpoint,
         userAgent: config.userAgent,
         timeoutMs: Math.max(250, config.timeoutMs ?? 3000),
@@ -226,7 +226,7 @@ export class NodeAnalyticsClient implements AnalyticsClient {
     return { accepted: false, code };
   }
 
-  private enqueue(request: UmamiRequest, eventName?: string, knownId?: string): void {
+  private enqueue(request: FormamiRequest, eventName?: string, knownId?: string): void {
     if (this.queue.length >= this.queueCapacity) {
       this.queue.shift();
       emit(this.config.onDiagnostic, {
@@ -328,7 +328,7 @@ export class NodeAnalyticsClient implements AnalyticsClient {
     }
   }
 
-  private async sendWithTimeout(requests: UmamiRequest[]): Promise<TransportResult> {
+  private async sendWithTimeout(requests: FormamiRequest[]): Promise<TransportResult> {
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       return await Promise.race([

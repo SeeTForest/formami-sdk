@@ -1,13 +1,23 @@
-# Umami Analytics SDK
+# Formami Analytics SDK
 
-这是位于产品代码与 Umami 之间的薄 SDK。它只解决每个产品都必须正确解决、且直接调用 Umami 很容易做错的部分：事件语义、Consent、伪名身份、隐私校验、异步队列、批量发送、有限重试和静默降级。
+源码仓库：[SeeTForest/formami-sdk](https://github.com/SeeTForest/formami-sdk)。npm 包为 `@seetheforest/formami-sdk`，NuGet 为 `Pystone.Analytics`，Python 为 `pystone-analytics`，当前版本均为 `0.1.2`。npm 通过 GitHub Release 分发；NuGet/Python 使用内部构建制品。
 
-SDK 不复制 Umami 的 Dashboard、查询 API 或业务数据库，也不建立通用插件系统。当前没有运行时第三方依赖。
+新代码使用 `Formami*` 类型；旧 `Umami*` 类型、Tracker 全局、Consent 存储键与缓存请求头继续兼容，详见 [迁移说明](docs/formami-migration.md)。
 
-TypeScript/Browser/Node 包通过公共 npm 分发：
+这是位于产品代码与 Formami 之间的薄 SDK。它只解决每个产品都必须正确解决、且直接调用 Formami 很容易做错的部分：事件语义、Consent、伪名身份、隐私校验、异步队列、批量发送、有限重试和静默降级。
+
+SDK 不复制 Formami 的 Dashboard、查询 API 或业务数据库，也不建立通用插件系统。当前没有运行时第三方依赖。
+
+开发或离线接入可运行 `tools/build-sdk.ps1`，再安装经校验的本地 `.tgz`：
 
 ```bash
-npm install --save-exact @perrin-yong/umami-sdk@0.1.1
+npm install --save-exact ./artifacts/sdk/seetheforest-formami-sdk-0.1.2.tgz
+```
+
+TypeScript/Browser/Node 的 Registry 安装命令为：
+
+```bash
+npm install --save-exact @seetheforest/formami-sdk@0.1.2
 ```
 
 配置字段、区域选择、Consent/Identity 生命周期和完整示例见 [`docs/configuration.md`](docs/configuration.md)；版本、测试、GitHub Release 和 npm 发布流程见 [`docs/cicd.md`](docs/cicd.md)。
@@ -36,7 +46,7 @@ flush()
 disable()
 ```
 
-`track`、`identify` 和 `page` 只做同步的本地校验与内存入队，不等待 DNS、TLS、HTTP、Umami 或磁盘。后台 Worker/微任务负责发送。网络超时、429、5xx、无响应和异常只影响 Analytics 队列。
+`track`、`identify` 和 `page` 只做同步的本地校验与内存入队，不等待 DNS、TLS、HTTP、Formami 或磁盘。后台 Worker/微任务负责发送。网络超时、429、5xx、无响应和异常只影响 Analytics 队列。
 
 `flush` 是显式的生命周期操作，可能等待配置的网络超时；不能在页面渲染、命令执行、保存、支付或其他业务热路径中调用。应用退出时可以尽力刷新，但必须接受超时和丢弃。`disable` 立即停止接收并清空内存身份与队列。
 
@@ -48,8 +58,8 @@ Client 持有单一当前 Subject。Browser、Desktop、插件和 CLI 使用长�
 
 | 产品形态 | 包 | 发送模型 | 离线持久化 |
 | --- | --- | --- | --- |
-| Browser | `@perrin-yong/umami-sdk/web` | Umami Tracker；始终先入队，下一微任务发送 | 无；刷新页面可丢弃 |
-| Node/OpenCode | `@perrin-yong/umami-sdk/node` | 内存队列 + `/api/batch` | 当前无 |
+| Browser | `@seetheforest/formami-sdk/web` | Formami Tracker；始终先入队，下一微任务发送 | 无；刷新页面可丢弃 |
+| Node/OpenCode | `@seetheforest/formami-sdk/node` | 内存队列 + `/api/batch` | 当前无 |
 | Windows Desktop | `Pystone.Analytics` | 后台 Task + `/api/batch` | 可选，原子替换 |
 | Python CLI/Agent | `pystone-analytics` | 后台线程 + `/api/batch` | 可选，原子替换 |
 
@@ -92,7 +102,7 @@ python -m unittest discover -s python/tests -v
 
 ## 版本与发布
 
-当前版本为 `0.1.1`。TypeScript 包发布为 `@perrin-yong/umami-sdk`；产品必须固定版本，不使用浮动的 `latest` 做不可控升级。发布包必须同时固定 SDK 版本、事件 Schema 版本和 Policy Version。
+当前版本为 `0.1.2`。TypeScript 包的发布目标为 `@seetheforest/formami-sdk`；产品必须固定版本，不使用浮动的 `latest` 做不可控升级。发布包必须同时固定 SDK 版本、事件 Schema 版本和 Policy Version。
 
 在 SDK 根目录统一生成三种安装制品：
 
@@ -100,6 +110,6 @@ python -m unittest discover -s python/tests -v
 .\tools\build-sdk.ps1
 ```
 
-输出位于忽略 Git 的 `artifacts/sdk/`，脚本会先执行 Schema 与全部运行时测试，并打印每个制品的 SHA-256。npm 产品使用公开发布的固定版本；`.tgz` 用于发布前/离线消费者验证，.NET/Python 产品固定安装这里生成的 `.nupkg`/`.whl`。任何产品都不要直接依赖移动中的源码目录。
+输出位于忽略 Git 的 `artifacts/sdk/`，脚本会先执行 Schema 与全部运行时测试，并打印每个制品的 SHA-256。新 npm 包当前通过 `.tgz` 做本地消费者验证；正式发布后产品再使用 Registry 中的固定版本，.NET/Python 产品固定安装这里生成的 `.nupkg`/`.whl`。任何产品都不要直接依赖移动中的源码目录。
 
 详细设计见 [`docs/architecture.md`](docs/architecture.md)，事件、身份和隐私规范见 [`docs/analytics-spec.md`](docs/analytics-spec.md)。人工使用与后台分析见 [`docs/product-integration.md`](docs/product-integration.md)；产品研发 Agent 应使用 [`docs/integration-guide.md`](docs/integration-guide.md)，并填写 [`docs/product-integration-template.md`](docs/product-integration-template.md)。npm 发布由 GitHub Release 驱动，详见 [`docs/cicd.md`](docs/cicd.md)。

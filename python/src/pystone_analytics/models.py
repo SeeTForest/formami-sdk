@@ -53,7 +53,7 @@ class AnalyticsConfig:
     surface: str
     product_version: str
     user_agent: str
-    sdk_version: str = "0.1.1"
+    sdk_version: str = "0.1.2"
     platform: str | None = None
     architecture: str | None = None
     locale: str | None = None

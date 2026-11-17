@@ -24,7 +24,7 @@ from .models import (
     TransportResult,
 )
 from .policy import PolicyEngine, PolicyError
-from .transport import UmamiHttpTransport
+from .transport import FormamiHttpTransport
 
 
 @dataclass
@@ -49,7 +49,7 @@ class AnalyticsClient:
     ) -> None:
         self._config = config
         self._policy = PolicyEngine(config)
-        self._transport = transport or UmamiHttpTransport(config)
+        self._transport = transport or FormamiHttpTransport(config)
         self._clock = clock
         self._random = random_value
         self._consent = config.initial_consent

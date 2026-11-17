@@ -1,22 +1,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { UmamiRequest } from '../core/index.js';
+import type { FormamiRequest } from '../core/index.js';
 import {
   NodeAnalyticsClient,
-  UmamiHttpTransport,
+  FormamiHttpTransport,
   type AnalyticsTransport,
   type TransportResult,
 } from '../node/index.js';
-import { WebAnalyticsClient, type UmamiTracker } from '../web/index.js';
+import { WebAnalyticsClient, type FormamiTracker } from '../web/index.js';
 import { baseConfig } from './helpers.js';
 
-const userAgent = 'Test/1.0 Analytics/0.1.1';
+const userAgent = 'Test/1.0 Analytics/0.1.2';
 
 class ScriptedTransport implements AnalyticsTransport {
-  readonly batches: UmamiRequest[][] = [];
+  readonly batches: FormamiRequest[][] = [];
   readonly results: Array<TransportResult | Error> = [];
 
-  async send(requests: UmamiRequest[]): Promise<TransportResult> {
+  async send(requests: FormamiRequest[]): Promise<TransportResult> {
     this.batches.push(requests);
     const result = this.results.shift() ?? { kind: 'success' as const };
     if (result instanceof Error) throw result;
@@ -166,16 +166,18 @@ test('HTTP transport treats malformed success bodies as accepted and bounds cach
     new Response('x'.repeat(65 * 1024), { status: 200 }),
   ];
   const fetchImplementation = (async (_input: unknown, init?: RequestInit) => {
-    seenCache.push(new Headers(init?.headers).get('x-umami-cache'));
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get('x-formami-cache'), headers.get('x-umami-cache'));
+    seenCache.push(headers.get('x-formami-cache'));
     return responses.shift()!;
   }) as typeof fetch;
-  const transport = new UmamiHttpTransport({
-    endpoint: 'https://umami.example.test',
+  const transport = new FormamiHttpTransport({
+    endpoint: 'https://formami.example.test',
     userAgent,
     timeoutMs: 250,
     fetchImplementation,
   });
-  const request = { type: 'event', payload: { website: baseConfig().websiteId } } as UmamiRequest;
+  const request = { type: 'event', payload: { website: baseConfig().websiteId } } as FormamiRequest;
 
   assert.equal((await transport.send([request])).kind, 'success');
   assert.equal((await transport.send([request])).kind, 'success');
@@ -186,20 +188,20 @@ test('HTTP transport treats malformed success bodies as accepted and bounds cach
 
 test('HTTP transport classifies retryable statuses and enforces its deadline', async () => {
   const statuses = [408, 429, 503, 400];
-  const statusTransport = new UmamiHttpTransport({
-    endpoint: 'https://umami.example.test',
+  const statusTransport = new FormamiHttpTransport({
+    endpoint: 'https://formami.example.test',
     userAgent,
     timeoutMs: 250,
     fetchImplementation: (async () => new Response('', { status: statuses.shift()! })) as typeof fetch,
   });
-  const request = { type: 'event', payload: { website: baseConfig().websiteId } } as UmamiRequest;
+  const request = { type: 'event', payload: { website: baseConfig().websiteId } } as FormamiRequest;
   assert.equal((await statusTransport.send([request])).kind, 'retryable');
   assert.equal((await statusTransport.send([request])).kind, 'retryable');
   assert.equal((await statusTransport.send([request])).kind, 'retryable');
   assert.equal((await statusTransport.send([request])).kind, 'permanent');
 
-  const blockedTransport = new UmamiHttpTransport({
-    endpoint: 'https://umami.example.test',
+  const blockedTransport = new FormamiHttpTransport({
+    endpoint: 'https://formami.example.test',
     userAgent,
     timeoutMs: 20,
     fetchImplementation: (async (_input: unknown, init?: RequestInit) =>
@@ -214,7 +216,7 @@ test('HTTP transport classifies retryable statuses and enforces its deadline', a
 
 test('web queue is bounded, transport failures are swallowed, and configuration fails fast', async () => {
   let calls = 0;
-  const tracker: UmamiTracker = {
+  const tracker: FormamiTracker = {
     track: async () => {
       calls += 1;
       throw new Error('tracker unavailable');

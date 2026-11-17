@@ -1,6 +1,6 @@
-# Umami SDK 生产就绪验证
+# Formami SDK 生产就绪验证
 
-本文记录 Umami Analytics SDK 的生产故障模型、自动化验证范围和上线门禁。验证基线为 SDK `0.1.1`、Schema `1`、Policy `1`，并已对照 Umami submodule `de474a1da915d4666768cad0af0bed5b3449d661` 的 `/api/send`、`/api/batch` 和 Web Tracker 实现。
+本文记录 Formami Analytics SDK 的生产故障模型、自动化验证范围和上线门禁。验证基线为 SDK `0.1.2`、Schema `1`、Policy `1`，历史验证对照的是改名前的 Umami submodule `de474a1da915d4666768cad0af0bed5b3449d661` 的 `/api/send`、`/api/batch` 和 Web Tracker 实现。
 
 ## 1. 核心保证
 
@@ -14,7 +14,7 @@ SDK 对宿主承诺：
 - Consent 拒绝或撤回与并发上报互斥，调用返回后不保留待发事件或 Subject；
 - `disable`、Node `close`、Python `close` 和 .NET `DisposeAsync` 后 Client 是终态，不再接受事件；
 - 持久队列恢复时重新执行结构、Website、Schema、Identity 和隐私校验，篡改或损坏文件会被删除而不是上传；
-- Web `beforeSend` 会再次验证全局 Tracker 请求，阻止 `window.umami` 或 `data-umami-event` 绕过中央事件注册表和 Identify allowlist。
+- Web `beforeSend` 会再次验证全局 Tracker 请求，阻止 `window.formami` 或 `data-formami-event` 绕过中央事件注册表和 Identify allowlist。
 
 Analytics 是 best-effort：进程崩溃、页面关闭、队列溢出、截止时间耗尽或长期离线时允许丢失数据。该取舍是宿主稳定性的组成部分。
 
@@ -24,7 +24,7 @@ Analytics 是 best-effort：进程崩溃、页面关闭、队列溢出、截止�
 | --- | ---: | --- |
 | Browser 队列 | 100 | 最大 10,000；满时丢最旧事件 |
 | Node/.NET/Python 队列 | 1,000 | 最大 10,000；满时丢最旧事件 |
-| Batch | 25 | 最大 100；低于 Umami 当前 500 上限 |
+| Batch | 25 | 最大 100；低于 Formami 当前 500 上限 |
 | 单次网络超时 | 3 秒 | 配置最大 60 秒 |
 | 重试 | 3 | 最大 10；指数退避和抖动 |
 | 事件年龄 | 24 小时 | 配置最大 30 天；过期丢弃 |
@@ -50,6 +50,8 @@ Analytics 是 best-effort：进程崩溃、页面关闭、队列溢出、截止�
 | Subject 切换与 Session Cache 重置 | 已测 | 已测 | 已测 | 旧队列不继承 |
 | 持久队列恢复、撤回、损坏、篡改 | 不适用 | 已测 | 已测 | 仅恢复仍符合当前策略的数据 |
 | Web Tracker 加载失败后重试 | 已测 | 不适用 | 不适用 | 失败隔离，下一事件可重试 |
+| Web 三方法热路径（含队列溢出、拒绝和 Storage 抛异常） | 已测 | 不适用 | 不适用 | 不访问 Storage/DOM，不直接调用 Tracker |
+| Web 加载重试前撤回/关闭，以及加载中撤回 | 已测 | 不适用 | 不适用 | 不启动待执行重试，晚到的加载完成不发送旧事件 |
 | 全局 Web Tracker 旁路 | 已测 | 不适用 | 不适用 | 未注册事件和非法 Identify 被阻断 |
 | 发布包真实安装 | npm | NuGet | wheel | 隔离目录安装；npm JS 真实上报/类型编译、NuGet 消费者编译与 Client 构造、wheel Client 构造成功 |
 
@@ -61,24 +63,24 @@ Analytics 是 best-effort：进程崩溃、页面关闭、队列溢出、截止�
 
 该命令执行生成文件一致性、Schema、文档契约、三端测试、构建打包、SHA-256 和三个制品的隔离安装冒烟。npm 冒烟不只检查导出名，还从打出的 tarball 创建真实 Node/Web Client、发送受控事件，并用包内 `.d.ts` 编译独立 TypeScript 消费者。CI 使用同一入口，避免本地与流水线出现两套标准。
 
-## 4. Umami 兼容性结论
+## 4. Formami 兼容性结论
 
 当前 submodule 的 `/api/batch`：
 
 - 接受最多 500 个请求；SDK 最大 Batch 为 100；
 - 每项复用 `/api/send` 校验，响应提供 `processed`、`errors`、`details` 和 `cache`；
-- SDK 在 `errors > 0` 时移除该批并记录永久失败诊断，因为 Umami 不返回可安全重试的逐项成功 Payload；
-- 事件、Identify、Distinct ID、秒级 timestamp 和 `x-umami-cache` 映射与当前源码一致；
+- SDK 在 `errors > 0` 时移除该批并记录永久失败诊断，因为 Formami 不返回可安全重试的逐项成功 Payload；
+- 事件、Identify、Distinct ID、秒级 timestamp 和 `x-formami-cache`（同时发送兼容头 `x-umami-cache`）映射与当前源码一致；
 - 2xx 响应体损坏时不重发，避免服务端已经写入后因响应解析失败产生重复事件。
 
-升级 Umami submodule 时必须重新检查这组语义并运行完整门禁。
+升级 Formami submodule 时必须重新检查这组语义并运行完整门禁。
 
 ## 5. 生产使用边界
 
 - 生产默认使用 SDK 内置 Transport。自定义 Transport 是测试/特殊集成扩展，必须自行保证线程安全、无副作用和截止时间；Node 与 .NET Client 会额外施加等待上限，Python 对不合作的同步自定义 Transport 只能让后台 daemon 线程退出宿主关键路径，无法强制终止第三方代码。
-- Browser 接入 SDK 后，业务事件只能调用 `analytics.track()`；直接调用 `window.umami` 或声明 `data-umami-event` 缺少 SDK 公共上下文，会被 `beforeSend` 拒绝。这是中央策略防旁路行为，不是 Tracker 故障。
+- Browser 接入 SDK 后，业务事件只能调用 `analytics.track()`；直接调用 `window.formami` 或声明 `data-formami-event` 缺少 SDK 公共上下文，会被 `beforeSend` 拒绝。这是中央策略防旁路行为，不是 Tracker 故障。
 - `flush` 只允许在测试或受控关闭阶段调用。业务热路径永远不等待 Analytics。
-- 网络超时只能限制 SDK 等待时间，不能撤回已经到达服务端的请求；Consent 撤回会阻止新请求并清理队列，但不能“取消”已经被 Umami 接收的事件。
+- 网络超时只能限制 SDK 等待时间，不能撤回已经到达服务端的请求；Consent 撤回会阻止新请求并清理队列，但不能“取消”已经被 Formami 接收的事件。
 - SDK 自动测试不能替代产品级 Staging 验收。每个产品仍需验证真实 Website ID、区域、CSP/代理、Consent UI、身份切换、Funnel、Retention 和实际宿主生命周期。
 
 ## 6. 上线门禁
@@ -88,7 +90,7 @@ SDK 制品可进入产品 Staging 的条件：完整门禁通过、工作区生�
 1. 使用 Staging Website 执行完整合成旅程；
 2. 在目标 Browser、Windows/.NET、Python 或 OpenCode/Bun 真实运行时执行断网、慢网、退出和升级测试；
 3. 确认 Analytics 停机不改变业务结果和性能等级；
-4. 抽样检查 Umami 中没有禁止字段、自由文本或错误身份；
+4. 抽样检查 Formami 中没有禁止字段、自由文本或错误身份；
 5. 填写 `docs/product-integration-template.md` 并给出明确 `approved` 结论。
 
 未完成产品级 Staging 验收时，只能称为“SDK 自动化门禁通过”，不能宣称具体产品已经生产验收。

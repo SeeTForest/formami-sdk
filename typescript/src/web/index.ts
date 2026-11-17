@@ -9,10 +9,10 @@ import {
   type ConsentState,
   type PageProperties,
   type TrackResult,
-  type UmamiRequest,
+  type FormamiRequest,
 } from '../core/index.js';
 
-export interface UmamiTracker {
+export interface FormamiTracker {
   track(): Promise<void>;
   track(eventName: string, data?: AnalyticsProperties): Promise<void>;
   track(
@@ -21,9 +21,14 @@ export interface UmamiTracker {
   identify(subjectId: string, data?: AnalyticsProperties): Promise<void>;
 }
 
+/** @deprecated Use FormamiTracker. */
+export type UmamiTracker = FormamiTracker;
+
 declare global {
   interface Window {
-    umami?: UmamiTracker;
+    formami?: FormamiTracker;
+    /** Compatibility with the existing tracker global. */
+    umami?: FormamiTracker;
     [key: string]: unknown;
   }
 }
@@ -35,7 +40,7 @@ export interface WebAnalyticsConfig extends AnalyticsConfig {
   autoTrack?: boolean;
   queueCapacity?: number;
   timeoutMs?: number;
-  tracker?: UmamiTracker;
+  tracker?: FormamiTracker;
 }
 
 export class WebAnalyticsClient implements AnalyticsClient {
@@ -43,10 +48,10 @@ export class WebAnalyticsClient implements AnalyticsClient {
   private readonly policy: PolicyEngine;
   private readonly queueCapacity: number;
   private consent: ConsentState;
-  private tracker: UmamiTracker | undefined;
+  private tracker: FormamiTracker | undefined;
   private subjectId: string | undefined;
   private disabled = false;
-  private queue: UmamiRequest[] = [];
+  private queue: FormamiRequest[] = [];
   private loadPromise: Promise<void> | undefined;
   private activeFlush: Promise<void> | undefined;
   private drainScheduled = false;
@@ -84,7 +89,7 @@ export class WebAnalyticsClient implements AnalyticsClient {
         properties,
         this.subjectId,
       );
-      this.enqueueOrSend(request, eventName);
+      this.enqueue(request, eventName);
       return accepted(eventId);
     } catch (error) {
       return rejected(this.config.onDiagnostic, error, eventName);
@@ -96,7 +101,7 @@ export class WebAnalyticsClient implements AnalyticsClient {
     try {
       const request = this.policy.createIdentifyRequest(subjectId, properties);
       this.subjectId = subjectId;
-      this.enqueueOrSend(request);
+      this.enqueue(request);
       return accepted();
     } catch (error) {
       return rejected(this.config.onDiagnostic, error);
@@ -111,7 +116,7 @@ export class WebAnalyticsClient implements AnalyticsClient {
         this.subjectId,
         this.config.allowUtm,
       );
-      this.enqueueOrSend(request);
+      this.enqueue(request);
       return accepted();
     } catch (error) {
       return rejected(this.config.onDiagnostic, error);
@@ -153,11 +158,14 @@ export class WebAnalyticsClient implements AnalyticsClient {
   }
 
   private enable(): void {
+    // Storage belongs to initialization/Consent transitions, never event calls.
     this.setTrackerDisabled(false);
-    if (this.tracker) {
-      this.scheduleDrain();
-      return;
-    }
+    this.ensureTracker();
+    this.scheduleDrain();
+  }
+
+  private ensureTracker(): void {
+    if (this.tracker || !this.canAccept()) return;
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     if (!this.loadPromise) {
       this.loadPromise = this.loadTracker()
@@ -182,7 +190,7 @@ export class WebAnalyticsClient implements AnalyticsClient {
     return { accepted: false, code };
   }
 
-  private enqueueOrSend(request: UmamiRequest, eventName?: string): void {
+  private enqueue(request: FormamiRequest, eventName?: string): void {
     if (this.queue.length >= this.queueCapacity) {
       this.queue.shift();
       emit(this.config.onDiagnostic, {
@@ -191,20 +199,22 @@ export class WebAnalyticsClient implements AnalyticsClient {
       });
     }
     this.queue.push(request);
-    this.enable();
     this.scheduleDrain();
   }
 
   private scheduleDrain(): void {
-    if (this.drainScheduled || !this.tracker) return;
+    if (this.drainScheduled) return;
     this.drainScheduled = true;
     queueMicrotask(() => {
       this.drainScheduled = false;
+      if (!this.canAccept() || this.queue.length === 0) return;
+      // Retry a failed loader in the background, without re-enabling storage.
+      this.ensureTracker();
       void this.flush();
     });
   }
 
-  private async send(request: UmamiRequest): Promise<void> {
+  private async send(request: FormamiRequest): Promise<void> {
     const tracker = this.tracker;
     if (!tracker || !this.canAccept()) return;
     try {
@@ -247,13 +257,13 @@ export class WebAnalyticsClient implements AnalyticsClient {
   }
 
   private async loadTracker(): Promise<void> {
-    if (window.umami) {
-      this.tracker = window.umami;
+    if (window.formami || window.umami) {
+      this.tracker = window.formami ?? window.umami;
       await this.flush();
       return;
     }
     const existing = document.querySelector<HTMLScriptElement>(
-      'script[data-analytics-provider="pystone-umami"]',
+      'script[data-analytics-provider="formami"], script[data-analytics-provider="pystone-umami"]',
     );
     if (existing) {
       await new Promise<void>((resolve, reject) => {
@@ -262,19 +272,19 @@ export class WebAnalyticsClient implements AnalyticsClient {
           once: true,
         });
       });
-      this.tracker = window.umami;
+      this.tracker = window.formami ?? window.umami;
       await this.flush();
       return;
     }
 
-    const handlerName = `__pystoneUmamiBeforeSend_${this.config.websiteId.replaceAll('-', '_')}`;
+    const handlerName = `__formamiBeforeSend_${this.config.websiteId.replaceAll('-', '_')}`;
     window[handlerName] = (type: string, payload: Record<string, unknown>) =>
       this.beforeSend(type, payload);
 
     const script = document.createElement('script');
     script.defer = true;
     script.src = `${this.policy.endpoint}/script.js`;
-    script.dataset.analyticsProvider = 'pystone-umami';
+    script.dataset.analyticsProvider = 'formami';
     script.dataset.websiteId = this.config.websiteId;
     script.dataset.hostUrl = this.policy.endpoint;
     script.dataset.domains = (this.config.domains ?? [this.config.hostname]).join(',');
@@ -293,7 +303,7 @@ export class WebAnalyticsClient implements AnalyticsClient {
       }, { once: true });
       document.head.appendChild(script);
     });
-    this.tracker = window.umami;
+    this.tracker = window.formami ?? window.umami;
     await this.flush();
   }
 
@@ -332,8 +342,10 @@ export class WebAnalyticsClient implements AnalyticsClient {
   private setTrackerDisabled(value: boolean): void {
     try {
       if (typeof window === 'undefined') return;
-      if (value) window.localStorage.setItem('umami.disabled', '1');
-      else window.localStorage.removeItem('umami.disabled');
+      for (const key of ['formami.disabled', 'umami.disabled']) {
+        if (value) window.localStorage.setItem(key, '1');
+        else window.localStorage.removeItem(key);
+      }
     } catch {
       // Storage can be unavailable in hardened browsers.
     }

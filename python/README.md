@@ -1,5 +1,7 @@
 # Python SDK
 
+本文中的 `analytics.example.com` / `analytics-cn.example.com` 是通用示例，不是可用服务；实际 Endpoint、区域与 Website ID 必须由宿主产品配置提供。
+
 支持 Python 3.10+，无运行时第三方依赖。普通上报只做本地入队；守护线程负责网络发送。
 
 当前包不在 PyPI 发布。使用 SDK 固定 Tag/Commit 的 `tools/build-sdk.ps1` 生成 wheel，记录 SHA-256，并从产品私有制品目录安装精确版本。
@@ -9,14 +11,14 @@ from pathlib import Path
 from pystone_analytics import AnalyticsClient, AnalyticsConfig, ConsentState
 
 analytics = AnalyticsClient(AnalyticsConfig(
-    endpoint="https://umami.pystone.net",
+    endpoint="https://analytics.example.com",
     website_id="<WEBSITE_ID>",
     hostname="cli.local",
     product="my-product",
     environment="production",
     surface="cli",
     product_version="1.0.0",
-    user_agent="MyProduct/1.0.0 UmamiSdk/0.1.1",
+    user_agent="MyProduct/1.0.0 FormamiSdk/0.1.2",
     initial_consent=ConsentState.GRANTED,
     # 使用宿主已确定的私有数据目录，不要使用当前工作目录。
     persistent_queue_path=Path(product_private_data_dir) / "analytics-queue.json",
@@ -35,7 +37,7 @@ analytics.close()
 
 用户撤回 Consent 时调用 `set_consent(ConsentState.WITHDRAWN)`；宿主同时删除自己的原始安装 ID。
 
-`close()` 是终态且可以重复调用；关闭后调用返回 `disabled`，重新启用必须创建新 Client。初始化配置错误会快速失败；初始化成功后的网络、Umami、持久队列和普通诊断回调故障不会传播到 `track/identify/page`。
+`close()` 是终态且可以重复调用；关闭后调用返回 `disabled`，重新启用必须创建新 Client。初始化配置错误会快速失败；初始化成功后的网络、Formami、持久队列和普通诊断回调故障不会传播到 `track/identify/page`。
 
 ## 构建
 

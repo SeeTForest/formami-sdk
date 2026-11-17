@@ -13,14 +13,14 @@ var transport = new FakeTransport();
 var diagnostics = new List<AnalyticsDiagnostic>();
 var options = new AnalyticsOptions
 {
-    Endpoint = new("https://umami.example.test"),
+    Endpoint = new("https://formami.example.test"),
     WebsiteId = Guid.Parse("123e4567-e89b-42d3-a456-426614174000"),
     Hostname = "desktop.example.test",
     Product = "test-product",
     Environment = "staging",
     Surface = "desktop",
     ProductVersion = "1.0.0",
-    UserAgent = "Test/1.0 Analytics/0.1.1",
+    UserAgent = "Test/1.0 Analytics/0.1.2",
     FlushInterval = TimeSpan.FromHours(1),
     OnDiagnostic = diagnostics.Add,
 };
@@ -52,7 +52,7 @@ await using (var client = new AnalyticsClient(options, transport))
 var installationA = AnalyticsIdentity.DeriveInstallationSubjectId("product-a", "installation");
 var installationB = AnalyticsIdentity.DeriveInstallationSubjectId("product-b", "installation");
 Assert(installationA.Length == 43 && installationA != installationB, "Installation IDs must be scoped.");
-Assert(AnalyticsIdentity.DeriveUserSubjectId(new byte[32], "user-1").Length == 43, "User ID must fit Umami.");
+Assert(AnalyticsIdentity.DeriveUserSubjectId(new byte[32], "user-1").Length == 43, "User ID must fit Formami.");
 
 var retryTransport = new FakeTransport();
 retryTransport.Results.Enqueue(new(TransportOutcome.Retryable));
@@ -77,7 +77,7 @@ await using (var client = new AnalyticsClient(retryOptions, retryTransport))
     Assert(client.PendingCount == 1, "Retryable failure must keep the item.");
     client.SetConsent(ConsentState.Withdrawn);
     Assert(client.PendingCount == 0, "Withdrawal must clear the queue.");
-    Assert(retryTransport.Resets == 1, "Withdrawal must reset the Umami session cache.");
+    Assert(retryTransport.Resets == 1, "Withdrawal must reset the Formami session cache.");
 }
 
 var blockingTransport = new BlockingTransport();
@@ -292,6 +292,31 @@ using (var httpTransport = new UmamiHttpTransport(options, httpClient))
         "Other HTTP 4xx must be permanent.");
 }
 
+// The new DTOs must work through the unchanged custom-transport interface.
+UmamiRequest compatibilityRequest = new FormamiRequest
+{
+    Type = "event",
+    Payload = new FormamiPayload { Website = options.WebsiteId.ToString("D") },
+};
+foreach (var legacyName in new[] { false, true })
+{
+    var cacheHandler = new ScriptedHttpHandler(
+        new(HttpStatusCode.OK) { Content = new StringContent("{\"cache\":\"valid-cache\"}") },
+        new(HttpStatusCode.OK) { Content = new StringContent("{}") },
+        new(HttpStatusCode.OK) { Content = new StringContent("{}") });
+    using var cacheClient = new HttpClient(cacheHandler);
+    using FormamiHttpTransport cacheTransport = legacyName
+        ? new UmamiHttpTransport(options, cacheClient)
+        : new FormamiHttpTransport(options, cacheClient);
+    await cacheTransport.SendAsync([compatibilityRequest]);
+    await cacheTransport.SendAsync([compatibilityRequest]);
+    Assert(cacheHandler.CacheHeaders[1] == ("valid-cache", "valid-cache"),
+        "New and legacy cache headers must carry the same value.");
+    cacheTransport.ResetSession();
+    await cacheTransport.SendAsync([compatibilityRequest]);
+    Assert(cacheHandler.CacheHeaders[2] == (null, null), "Both cache headers must reset.");
+}
+
 Console.WriteLine("Pystone.Analytics .NET tests passed.");
 
 static AnalyticsOptions CopyOptions(
@@ -421,11 +446,17 @@ internal sealed class SynchronouslyBlockingTransport : IAnalyticsTransport
 internal sealed class ScriptedHttpHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
 {
     private readonly Queue<HttpResponseMessage> _responses = new(responses);
+    public List<(string? Formami, string? Legacy)> CacheHeaders { get; } = [];
 
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(_responses.Dequeue());
+        CancellationToken cancellationToken)
+    {
+        CacheHeaders.Add((
+            request.Headers.TryGetValues("x-formami-cache", out var current) ? current.Single() : null,
+            request.Headers.TryGetValues("x-umami-cache", out var legacy) ? legacy.Single() : null));
+        return Task.FromResult(_responses.Dequeue());
+    }
 }
 
 internal sealed class BlockingProperties(string key, object? value) : IReadOnlyDictionary<string, object?>

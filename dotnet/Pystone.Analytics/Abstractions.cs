@@ -46,7 +46,7 @@ public sealed class AnalyticsOptions
     public required string Surface { get; init; }
     public required string ProductVersion { get; init; }
     public required string UserAgent { get; init; }
-    public string SdkVersion { get; init; } = "0.1.1";
+    public string SdkVersion { get; init; } = "0.1.2";
     public string? Platform { get; init; }
     public string? Architecture { get; init; }
     public string? Locale { get; init; }
@@ -76,7 +76,8 @@ public interface IAnalyticsClient : IAsyncDisposable
     void Disable();
 }
 
-public sealed class UmamiRequest
+// Legacy DTO names remain for source and binary compatibility.
+public class UmamiRequest
 {
     [JsonPropertyName("type")]
     public required string Type { get; init; }
@@ -85,7 +86,7 @@ public sealed class UmamiRequest
     public required UmamiPayload Payload { get; init; }
 }
 
-public sealed class UmamiPayload
+public class UmamiPayload
 {
     [JsonPropertyName("website")]
     public required string Website { get; init; }
@@ -139,3 +140,9 @@ public interface IAnalyticsTransport
 
     void ResetSession() { }
 }
+
+/// <summary>Formami request using the existing compatible wire payload.</summary>
+public sealed class FormamiRequest : UmamiRequest { }
+
+/// <summary>Formami payload using the existing compatible JSON field names.</summary>
+public sealed class FormamiPayload : UmamiPayload { }

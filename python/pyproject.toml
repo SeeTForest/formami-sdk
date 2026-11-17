@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pystone-analytics"
-version = "0.1.1"
-description = "Thin, privacy-first Umami SDK for Python products"
+version = "0.1.2"
+description = "Thin, privacy-first Formami SDK for Python products"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
